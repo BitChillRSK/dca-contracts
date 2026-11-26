@@ -345,29 +345,41 @@ contract LendingShareWithdrawalTest is DcaDappTest {
                          LAYERBANK FORK
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev The received aTokens redeem at the live Pool from the user's own address, for the position
-    ///      less at most one scaled share, which stays unbooked on the handler.
+    /// @dev Redeem all received shares, including any residue from the first floored Pool withdrawal.
+    ///      Preserve pre-existing user shares and distinguish them from the handler's forfeited share.
     function test_fork_layerBankWithdrawalThenRedeemAtPool() external onlyLayerBankFork {
         ILayerBankPool pool = ILayerBankPool(ILayerBankAToken(receiptToken).POOL());
+        // A separate user-held position must survive both Pool withdrawals unchanged in scaled units.
+        vm.startPrank(USER);
+        stablecoin.approve(address(pool), AMOUNT_TO_SPEND);
+        pool.supply(address(stablecoin), AMOUNT_TO_SPEND, USER, 0);
+        vm.stopPrank();
+
         uint256 principal = _routeBalance(USER);
         uint256 shares = lendingHandler.getUserShares(USER);
         uint256 moved = _expectedMovedShares(shares);
         uint256 scaledBefore = _receiptShares(USER);
+        assertGt(scaledBefore, 0, "pre-existing wallet position was not seeded");
+        uint256 handlerSharesBefore = _receiptShares(address(stablecoinHandler));
+        uint256 handlerCashBefore = stablecoin.balanceOf(address(stablecoinHandler));
 
         _withdrawShares(USER);
         assertEq(_receiptShares(USER) - scaledBefore, moved, "aToken transfer did not move the half-up shares");
+        assertEq(handlerSharesBefore - _receiptShares(address(stablecoinHandler)), moved);
+        assertLe(shares - moved, 1, "handler forfeited more than one scaled share");
         assertEq(lendingHandler.getUserShares(USER), 0);
+        assertEq(_routeBalance(USER), 0);
 
         uint256 index = pool.getReserveNormalizedIncome(address(stablecoin));
-        uint256 amount = moved * index / 1e27;
-        uint256 stablecoinBefore = stablecoin.balanceOf(USER);
-        vm.prank(USER);
-        pool.withdraw(address(stablecoin), amount, USER);
-        assertEq(stablecoin.balanceOf(USER) - stablecoinBefore, amount);
+        assertGe(index, 1e27, "share-rounding bound assumes index >= RAY");
+        uint256 amount = _redeemReceivedLayerBankShares(pool, index, moved, scaledBefore);
         // The two half-up deposit mints can lose one scaled share in total, and the transfer
-        // can leave one more. Convert that two-share bound to underlying units, rounding up.
+        // can leave one more on the handler. The user's Pool residue is redeemed separately.
+        // Convert that two-share bound to underlying units, rounding up.
         uint256 roundingTolerance = (2 * index + 1e27 - 1) / 1e27;
         assertApproxEqAbs(amount, principal, roundingTolerance, "redeemed position differs from principal");
+        assertEq(_receiptShares(address(stablecoinHandler)), handlerSharesBefore - moved);
+        assertEq(stablecoin.balanceOf(address(stablecoinHandler)), handlerCashBefore);
         console2.log("LayerBank share withdrawal: scaled shares moved", moved, "underlying redeemed", amount);
     }
 
@@ -393,6 +405,41 @@ contract LendingShareWithdrawalTest is DcaDappTest {
     function _withdrawShares(address user) private {
         vm.prank(user);
         dcaManager.withdrawLendingShares(address(stablecoin), s_routeIndex);
+    }
+
+    /// @dev A floored underlying withdrawal can burn one fewer received share. Redeem that share too,
+    ///      and prove that all received shares were consumed without touching pre-existing shares.
+    function _redeemReceivedLayerBankShares(
+        ILayerBankPool pool,
+        uint256 index,
+        uint256 receivedShares,
+        uint256 preExistingShares
+    ) private returns (uint256) {
+        uint256 cashBefore = stablecoin.balanceOf(USER);
+        uint256 amount = receivedShares * index / 1e27;
+        uint256 expectedBurn = (amount * 1e27 + index / 2) / index;
+        assertLe(expectedBurn, receivedShares, "Pool withdrawal would consume pre-existing shares");
+
+        vm.prank(USER);
+        pool.withdraw(address(stablecoin), amount, USER);
+        assertEq(stablecoin.balanceOf(USER) - cashBefore, amount, "first Pool payout differs from request");
+        uint256 remainingShares = receivedShares - expectedBurn;
+        assertEq(_receiptShares(USER), preExistingShares + remainingShares, "first Pool burn differs from half-up");
+        assertLe(remainingShares, 1, "floored Pool withdrawal left more than one received share");
+        console2.log("LayerBank Pool floor withdrawal: underlying", amount, "remaining scaled shares", remainingShares);
+
+        if (remainingShares != 0) {
+            // Nearest underlying value of one scaled share maps back to that share for index >= RAY.
+            uint256 remainderAmount = (remainingShares * index + 5e26) / 1e27;
+            vm.prank(USER);
+            pool.withdraw(address(stablecoin), remainderAmount, USER);
+            amount += remainderAmount;
+        }
+
+        assertEq(_receiptShares(USER), preExistingShares, "received shares remain or pre-existing shares were spent");
+        uint256 receivedCash = stablecoin.balanceOf(USER) - cashBefore;
+        assertEq(receivedCash, amount, "total Pool payout differs from requests");
+        return receivedCash;
     }
 
     /// @dev Expects the withdrawal to revert because the handler's receipt-share balance fell by `moved`.

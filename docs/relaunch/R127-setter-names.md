@@ -35,6 +35,7 @@ The ABI changes are intentional. No compatibility aliases are required.
 - [x] Open or update affected consumer issues in the same turn as the PR.
 - [x] Correct the pre-existing LayerBank share-withdrawal fork assertion described below. Preserve its exact share-transfer and cash-receipt checks.
 - [x] Correct the pre-existing schedule-period invariant described below and add its deterministic regression.
+- [x] Complete the LayerBank fork redemption checks and document the rounding example for audit review.
 
 ## Out of scope
 
@@ -61,6 +62,8 @@ The ABI changes are intentional. No compatibility aliases are required.
 - `src/PurchaseUniswap.sol`
 - `src/interfaces/IDcaManager.sol`
 - `src/interfaces/IPurchaseUniswap.sol`
+- `src/layerbank/README.md` (rounding-note link only)
+- `docs/relaunch/LAYERBANK_ROUNDING.md`
 - `test/ai-generated/audit/NethermindAuditFindings.t.sol`
 - `test/ai-generated/fuzz/Handler.t.sol`
 - `test/ai-generated/fuzz/Invariants.t.sol`
@@ -199,3 +202,34 @@ SWAP_TYPE=mocSwaps LENDING_PROTOCOL=layerbank EXPECTED_LENDING_PROTOCOL=layerban
 
 The scoped stack check for #204 reports zero ancestry gaps against parent `fa838c6e`.
 Next unassigned: none.
+
+## Review follow-up — complete share redemption and audit evidence
+
+The owner requested stronger tests and a durable explanation of the rounding observed at block 9443471.
+This follow-up changes tests and documentation only. Production accounting and the accepted one-share forfeiture remain unchanged.
+
+- Extend `test_fork_layerBankWithdrawalThenRedeemAtPool` to check the handler's exact external share decrease and any one-share forfeiture.
+- Measure the user's scaled-share burn after the first floored Pool withdrawal. Assert the exact cash receipt and the predicted residual shares.
+- Seed a separate, nonzero user-held Pool position so the preservation check exercises actual pre-existing shares.
+- Redeem any residual received share and assert its exact cash receipt. Restore the user's pre-existing scaled balance without spending pre-existing shares.
+- Compare total measured cash from both withdrawals against the index-derived bound. The bound covers this two-deposit fixture, not an arbitrary deposit history.
+- Strengthen the schedule-period regression with explicit minimum-setting assertions and rejection checks below the raised minimum.
+- Add `docs/relaunch/LAYERBANK_ROUNDING.md` with exact pinned-block values, the distinction between handler forfeiture and wallet residue, the rounding bound, and audit assumptions.
+- Link that note from `AUDIT_GUIDE.md` and `src/layerbank/README.md`.
+- Run the two changed suites under default and deploy profiles. Replay the original invariant seed and the LayerBank fork suite at block 9443471 and the chain tip under both profiles.
+
+Do not characterize this amount/index-dependent behavior as infrequent without measurements.
+Do not promise an audit severity. Present the accepted forfeiture and external-protocol assumptions for independent review.
+
+### Follow-up verification
+
+- Both profiles: the two changed suites pass with the original invariant seed (26 passed, three fork-only skips per profile).
+- After adding the nonzero wallet fixture, `LendingShareWithdrawalTest` passes under both profiles (14 passed, three fork-only skips per profile).
+- The same suite passes at block 9443471 and the chain tip under both profiles (nine passed, eight mock-only skips per run).
+- At block 9443471, the first withdrawal pays `3999999999999999999997` base units and leaves one received scaled share.
+- The second withdrawal consumes that share and raises total cash to `3999999999999999999998`. The seeded wallet shares remain intact.
+- The raised-minimum regression explicitly verifies both assignments and refuses new creation and period edits below fourteen days.
+- `forge fmt --check`, `git diff --check`, and the local documentation-link check pass.
+- The scoped stack check passes with zero ancestry gaps. Production Solidity remains unchanged from the prior PR head.
+
+The exact follow-up commands and the earlier full-gate results appear in the PR description.
