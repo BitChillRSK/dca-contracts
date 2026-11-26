@@ -1,6 +1,6 @@
 # R127 — Consistent configuration setter names
 
-Status: **in progress** · Assigned: yes (2026-11-26) · Optional/further-review: no
+Status: **implemented; PR [#204](https://github.com/BitChillRSK/dca-contracts/pull/204) open** · Assigned: yes (2026-11-26) · Optional/further-review: no
 
 ## Objective
 
@@ -19,22 +19,22 @@ The ABI changes are intentional. No compatibility aliases are required.
 
 ## Scope
 
-- [ ] Rename `updatePurchaseAmount` to `setPurchaseAmount`.
-- [ ] Rename `updatePurchasePeriod` to `setPurchasePeriod`.
-- [ ] Rename these events, preserving each contract prefix:
+- [x] Rename `updatePurchaseAmount` to `setPurchaseAmount`.
+- [x] Rename `updatePurchasePeriod` to `setPurchasePeriod`.
+- [x] Rename these events, preserving each contract prefix:
   - `PurchaseAmountUpdated` → `PurchaseAmountSet`.
   - `PurchasePeriodUpdated` → `PurchasePeriodSet`.
   - `MaxSchedulesPerTokenModified` → `MaxSchedulesPerTokenSet`.
   - `MinPurchasePeriodModified` → `MinPurchasePeriodSet`.
   - `AmountOutMinimumPercentUpdated` → `AmountOutMinimumPercentSet`.
   - `OracleUpdated` → `OracleSet`.
-- [ ] Preserve function arguments, event fields, indexing, validation, authorization, guards, and emission conditions.
-- [ ] Update matching tests, fuzz handlers, ABI inventories, and current operational references.
-- [ ] Check all first-party explicit configuration setters against the convention.
-- [ ] Record the convention in `AGENTS.md` and update its current function references.
-- [ ] Open or update affected consumer issues in the same turn as the PR.
-- [ ] Correct the pre-existing LayerBank share-withdrawal fork assertion described below. Preserve its exact share-transfer and cash-receipt checks.
-- [ ] Correct the pre-existing schedule-period invariant described below and add its deterministic regression.
+- [x] Preserve function arguments, event fields, indexing, validation, authorization, guards, and emission conditions.
+- [x] Update matching tests, fuzz handlers, ABI inventories, and current operational references.
+- [x] Check all first-party explicit configuration setters against the convention.
+- [x] Record the convention in `AGENTS.md` and update its current function references.
+- [x] Open or update affected consumer issues in the same turn as the PR.
+- [x] Correct the pre-existing LayerBank share-withdrawal fork assertion described below. Preserve its exact share-transfer and cash-receipt checks.
+- [x] Correct the pre-existing schedule-period invariant described below and add its deterministic regression.
 
 ## Out of scope
 
@@ -107,19 +107,19 @@ make fork-layerbank
 
 ## Success criteria
 
-- [ ] The two new function names replace their old names without aliases.
-- [ ] The six new event names replace their old names.
-- [ ] Only `TokenBalanceUpdated` and `UserSharesUpdated` retain `Updated` in first-party events; no event retains `Modified`.
-- [ ] The production-source change consists only of approved identifier substitutions.
-- [ ] Required commands pass and affected consumers have linked follow-ups.
-- [ ] The PR preserves ancestry from #203 and README Status names the new PR.
+- [x] The two new function names replace their old names without aliases.
+- [x] The six new event names replace their old names.
+- [x] Only `TokenBalanceUpdated` and `UserSharesUpdated` retain `Updated` in first-party events; no event retains `Modified`.
+- [x] The production-source change consists only of approved identifier substitutions.
+- [x] Required commands pass and affected consumers have linked follow-ups.
+- [x] The PR preserves ancestry from #203 and README Status names the new PR.
 
 ## Reviewer checklist
 
-- [ ] Matches Scope and preserves protocol invariants.
-- [ ] Required checks pass and exact commands appear in the PR.
-- [ ] Extra paths are direct dependencies and appear in the PR description.
-- [ ] No unrelated changes, deployments, or merges.
+- [x] Matches Scope and preserves protocol invariants.
+- [x] Required checks pass and exact commands appear in the PR.
+- [x] Extra paths are direct dependencies and appear in the PR description.
+- [x] No unrelated changes, deployments, or merges.
 
 ## ABI / deploy / cutover impact
 
@@ -189,3 +189,13 @@ SWAP_TYPE=mocSwaps LENDING_PROTOCOL=layerbank EXPECTED_LENDING_PROTOCOL=layerban
 - The deterministic schedule-period regression and the original failing seed pass.
 - All four production files match the updated parent plus the approved name substitutions.
 - The inventory contains 13 configuration setters and 15 `Set` events.
+
+## Consumer follow-ups
+
+- [front-end#64](https://github.com/BitChillRSK/front-end/issues/64): schedule-edit selectors, feedback cases, and generated ABIs.
+- [bitchill-monitoring#59](https://github.com/BitChillRSK/bitchill-monitoring/issues/59): renamed event decoding and relaunch ABIs.
+- [docs#16](https://github.com/BitChillRSK/docs/issues/16): relaunch signatures, events, and related documentation issues.
+- No batching, getter, schedule model, token, or route changes require follow-ups in the other three consumers.
+
+The scoped stack check for #204 reports zero ancestry gaps against parent `fa838c6e`.
+Next unassigned: none.

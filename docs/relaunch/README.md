@@ -72,7 +72,7 @@ decided against). No further re-judgement PRs.
 
 ## Status
 
-- Assigned: [R127-setter-names.md](./R127-setter-names.md), 2026-11-26. In progress, stacked on [#203](https://github.com/BitChillRSK/dca-contracts/pull/203). Next unassigned: none.
+- Implemented; open for review: [R127-setter-names.md](./R127-setter-names.md), GitHub [#204](https://github.com/BitChillRSK/dca-contracts/pull/204), stacked on updated [#203](https://github.com/BitChillRSK/dca-contracts/pull/203) (`fa838c6e`). All configuration setters use `set…` functions and `…Set` events. Next unassigned: none.
 
 - Merged: [R122-kann-lending-withdrawals.md](./R122-kann-lending-withdrawals.md) (GitHub [#199](https://github.com/BitChillRSK/dca-contracts/pull/199)), Kann #14, #19 and #20 item 1.
 - Current follow-ups: [R123-kann-configuration.md](./R123-kann-configuration.md), assigned on 2026-11-25, GitHub [#200](https://github.com/BitChillRSK/dca-contracts/pull/200), Kann #12, #23 and #20 item 5; and [R124-kann-purchase-reentrancy.md](./R124-kann-purchase-reentrancy.md), assigned on 2026-11-25 and stacked on #200, GitHub [#201](https://github.com/BitChillRSK/dca-contracts/pull/201), Kann #18 I-09; and [R125-kann-docs-and-consistency.md](./R125-kann-docs-and-consistency.md), assigned on 2026-11-25 and stacked on #201, GitHub [#202](https://github.com/BitChillRSK/dca-contracts/pull/202), Kann #13 and #16–#26 documentation and the source-consistency sweep; and [R126-dex-floor-cap.md](./R126-dex-floor-cap.md), assigned on 2026-11-26 and stacked on #202, GitHub [#203](https://github.com/BitChillRSK/dca-contracts/pull/203): the Dex oracle floor gets a fixed 95% lower bound in code.
