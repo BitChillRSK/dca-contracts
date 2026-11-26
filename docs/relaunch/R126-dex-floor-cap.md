@@ -61,7 +61,7 @@ The owner requested an internal constant with no public getter. No production co
 - `src/PurchaseUniswap.sol`, `src/interfaces/IPurchaseUniswap.sol`, `src/idle/IdleHandlerDex.sol`, `src/layerbank/LayerBankHandlerDex.sol`, `src/sovryn-legacy/SovrynHandlerDex.sol`, `src/tropykus-legacy/TropykusHandlerDex.sol`
 - `script/Constants.sol` and the Dex deploy scripts and helper configs
 - Tests under `test/unit/`, `test/ai-generated/`, `test/fizz/`, `test/gas/` that use the safety check
-- `AUDIT_GUIDE.md`, `PROPERTIES.md`, docs as above
+- `AUDIT_GUIDE.md`, `PROPERTIES.md`, `audits/README.md` (the Kann row), docs as above
 
 ## Required tests
 
