@@ -130,6 +130,8 @@ Repeat the full gates for this combined tree because the parent update changes e
 
 ## Verification results — combined tree on `fa838c6e`
 
+Recorded before the LayerBank rounding and invariant test changes moved to #205 (R128); the lane counts below describe the tree at `fa838c6e` plus this PR.
+
 - Targeted MoC suites: 51 passed, 0 failed.
 - Targeted Dex suites: 78 passed, 0 failed.
 - `make check` and `make check-deploy`: all six lanes pass, with 1031 / 1047 / 988 / 988 / 1003 / 1003 tests passed.
