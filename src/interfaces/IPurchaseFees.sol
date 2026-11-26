@@ -44,8 +44,10 @@ interface IPurchaseFees {
     event PurchaseFees__MinFeeRateSet(uint256 minFeeRate);
     /// @notice The maximum fee rate was set at construction or changed by the owner.
     event PurchaseFees__MaxFeeRateSet(uint256 maxFeeRate);
-    /// @notice The purchase amount at or below which the maximum fee rate applies was set at
-    ///         construction or changed by the owner.
+    /**
+     * @notice The purchase amount at or below which the maximum fee rate applies was set at
+     *         construction or changed by the owner.
+     */
     event PurchaseFees__PurchaseLowerBoundSet(uint256 feePurchaseLowerBound);
     /// @notice The address that receives purchase fees was set at construction or changed by the owner.
     event PurchaseFees__FeeCollectorAddressSet(address indexed feeCollector);
