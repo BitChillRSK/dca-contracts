@@ -35,7 +35,6 @@ abstract contract Snapshots is Base {
         bytes32[2] pathHash;
         bool[2][2] pathAllowed; // pathAllowed[dex][path]: path 0 direct, path 1 via USDT0
         uint256[2] percent;
-        uint256[2] safety;
         address[2] oracle;
         bool[2] oracleValid;
         uint256[2] oraclePrice;
@@ -180,7 +179,6 @@ abstract contract Snapshots is Base {
             s.pathAllowed[d][0] = u.isPurchasePathAllowed(path0);
             s.pathAllowed[d][1] = u.isPurchasePathAllowed(path1);
             s.percent[d] = u.getAmountOutMinimumPercent();
-            s.safety[d] = u.getAmountOutMinimumSafetyCheck();
             s.oracle[d] = address(u.getMocOracle());
             (s.oraclePrice[d], s.oracleValid[d]) = _oracleInfo(address(u));
         }

@@ -44,11 +44,6 @@ interface IPurchaseUniswap {
     /// @notice The swap-time oracle floor was set at construction (`oldValue` 0) or changed by the owner.
     event PurchaseUniswap__AmountOutMinimumPercentUpdated(uint256 oldValue, uint256 newValue);
     /**
-     * @notice The lower bound on the swap-time oracle floor was set at construction (`oldValue` 0) or
-     *         changed by the owner.
-     */
-    event PurchaseUniswap__AmountOutMinimumSafetyCheckUpdated(uint256 oldValue, uint256 newValue);
-    /**
      * @notice The min-out MoC BTC/USD oracle was set at construction (`oldOracle` zero) or changed by
      *         the owner.
      */
@@ -62,10 +57,8 @@ interface IPurchaseUniswap {
     error PurchaseUniswap__WrongNumberOfTokensOrFeeRates(uint256 numberOfIntermediateTokens, uint256 numberOfFeeRates);
     /// @notice Swap-time oracle floor cannot exceed 100%.
     error PurchaseUniswap__AmountOutMinimumPercentTooHigh();
-    /// @notice Swap-time oracle floor cannot be set below the safety-check bound.
+    /// @notice Swap-time oracle floor cannot be set below `MIN_AMOUNT_OUT_MINIMUM_PERCENT` (95%).
     error PurchaseUniswap__AmountOutMinimumPercentTooLow();
-    /// @notice Safety-check bound cannot exceed 100%.
-    error PurchaseUniswap__AmountOutMinimumSafetyCheckTooHigh();
     /// @notice Oracle address cannot be zero.
     error PurchaseUniswap__InvalidOracleAddress();
     /// @notice MoC oracle `getPriceInfo` reported an invalid price.
@@ -80,8 +73,6 @@ interface IPurchaseUniswap {
     error PurchaseUniswap__OracleUnchanged(address oracle);
     /// @notice The swap-time oracle floor already has this value.
     error PurchaseUniswap__AmountOutMinimumPercentUnchanged(uint256 amountOutMinimumPercent);
-    /// @notice The safety-check bound already has this value.
-    error PurchaseUniswap__AmountOutMinimumSafetyCheckUnchanged(uint256 amountOutMinimumSafetyCheck);
     /// @notice The currently active path cannot be revoked; activate another allowed path first.
     error PurchaseUniswap__CannotRevokeActivePurchasePath(bytes32 pathHash);
     /// @notice `caller` is neither this handler's owner nor an OperationsAdmin swapper.
@@ -127,7 +118,8 @@ interface IPurchaseUniswap {
 
     /**
      * @notice Set the swap-time oracle floor as a 1e18-scaled fraction of the oracle-implied rBTC.
-     * @param amountOutMinimumPercent New fraction. Cannot exceed 100% or fall below the safety check.
+     * @param amountOutMinimumPercent New fraction. Must be between `MIN_AMOUNT_OUT_MINIMUM_PERCENT` (95%)
+     *        and 100%.
      * @dev Uniswap `amountOutMinimum` is `max(thisFloor, minRbtcOut)`, so the swapper's quote-derived
      *      `minRbtcOut` sets operational tightness and this value is the bound that holds when that
      *      minimum is absent, stale, or hostile. Deploy it loose enough that a healthy batch never
@@ -137,19 +129,9 @@ interface IPurchaseUniswap {
     function setAmountOutMinimumPercent(uint256 amountOutMinimumPercent) external;
 
     /**
-     * @notice Set the lowest `amountOutMinimumPercent` the owner may configure.
-     * @param amountOutMinimumSafetyCheck New bound, 1e18-scaled. Never enters swap math.
-     * @dev The floor percentage cannot be set below this bound, so lowering it further takes two calls,
-     *      this bound first. One Safe transaction can batch them. Raising this bound above the active
-     *      floor reverts without changing state. Reverts with
-     *      `PurchaseUniswap__AmountOutMinimumSafetyCheckUnchanged` if it equals the current bound.
-     */
-    function setAmountOutMinimumSafetyCheck(uint256 amountOutMinimumSafetyCheck) external;
-
-    /**
      * @notice Point min-out at a new MoC BTC/USD oracle.
      * @param newOracle New oracle. Cannot be zero.
-     * @dev Not bounded by the safety check: a new oracle changes the floor in one transaction.
+     * @dev Not bounded by `MIN_AMOUNT_OUT_MINIMUM_PERCENT`: a new oracle moves the floor in one call.
      *      Reverts with `PurchaseUniswap__OracleUnchanged` if it is already the oracle.
      */
     function setMocOracle(address newOracle) external;
@@ -170,12 +152,6 @@ interface IPurchaseUniswap {
      * @return The fraction applied to the oracle-implied rBTC when building `amountOutMinimum`.
      */
     function getAmountOutMinimumPercent() external view returns (uint256);
-
-    /**
-     * @notice The bound that limits how far `setAmountOutMinimumPercent` may widen the live floor.
-     * @return The lowest value `setAmountOutMinimumPercent` accepts.
-     */
-    function getAmountOutMinimumSafetyCheck() external view returns (uint256);
 
     /**
      * @notice Oracle currently used to build `amountOutMinimum`.

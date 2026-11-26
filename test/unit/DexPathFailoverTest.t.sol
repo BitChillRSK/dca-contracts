@@ -405,7 +405,6 @@ contract DexPathFailoverTest is DcaDappTest {
                     FEE_COLLECTOR,
                     IPurchaseFees(address(stablecoinHandler)).getFeeSettings(),
                     primary.getAmountOutMinimumPercent(),
-                    primary.getAmountOutMinimumSafetyCheck(),
                     OWNER
                 )
             )

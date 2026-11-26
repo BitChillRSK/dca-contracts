@@ -8,6 +8,14 @@ Planning review in GitHub [#105](https://github.com/BitChillRSK/dca-contracts/pu
 [#104](https://github.com/BitChillRSK/dca-contracts/pull/104) (current `PurchaseUniswap`), and R57 /
 [#106](https://github.com/BitChillRSK/dca-contracts/pull/106).
 
+## Amendment — 2026-11-26
+
+[R126](./R126-dex-floor-cap.md) replaces this spec's owner-settable safety check with the constant
+`MIN_AMOUNT_OUT_MINIMUM_PERCENT` (95%). The live floor still moves inside `[95%, 100%]` in one call, but
+no owner call can take it below 95%. The two-call widening path, and the safety check's storage, setter,
+getter, event and errors, are gone. The rest of this spec, the floor formula and the caller minimum
+included, is unchanged.
+
 ## Objective
 
 Make the swapper's per-batch `minRbtcOut` the operational Dex fill bound. Keep both slippage words

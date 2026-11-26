@@ -101,7 +101,6 @@ contract RoleSecurityTest is Test {
             FEE_COLLECTOR,
             feeSettings,
             DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
-            DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK,
             OWNER
         );
 
@@ -153,7 +152,6 @@ contract RoleSecurityTest is Test {
                 minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
             }),
             DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
-            DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK,
             OWNER
         );
 

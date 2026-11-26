@@ -10,7 +10,7 @@ import "../Constants.sol";
 import {ownableUnauthorized} from "../utils/OzRevert.sol";
 
 /**
- * @notice R123 (Kann #12): the eight configuration setters refuse a write that changes nothing.
+ * @notice R123 (Kann #12): the seven configuration setters refuse a write that changes nothing.
  * @dev Authorization and validation run first, so a caller who may not write, or a value that is
  *      invalid, still gets that error even when it equals the stored value. A real change still
  *      succeeds; the setters' own suites cover its event and effect.
@@ -141,22 +141,6 @@ contract UnchangedConfigurationTest is DcaDappTest {
         vm.expectRevert(ownableUnauthorized(USER));
         vm.prank(USER);
         handler.setAmountOutMinimumPercent(current);
-    }
-
-    function testSetAmountOutMinimumSafetyCheckRejectsTheCurrentValue() external onlyDexSwaps {
-        IPurchaseUniswap handler = IPurchaseUniswap(address(stablecoinHandler));
-        uint256 current = handler.getAmountOutMinimumSafetyCheck();
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumSafetyCheckUnchanged.selector, current
-            )
-        );
-        vm.prank(OWNER);
-        handler.setAmountOutMinimumSafetyCheck(current);
-
-        vm.expectRevert(ownableUnauthorized(USER));
-        vm.prank(USER);
-        handler.setAmountOutMinimumSafetyCheck(current);
     }
 
     /// @dev The owner and a swapper are both refused for the active path; a stranger is refused as

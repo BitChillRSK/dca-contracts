@@ -332,7 +332,6 @@ contract FinalDeploymentTest is Test {
             usdt0IntermediateTokens: usdt0Intermediate,
             usdt0PoolFeeRates: usdt0Fees,
             amountOutMinimumPercent: DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
-            amountOutMinimumSafetyCheck: DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK,
             feeCollector: feeCollector,
             initialSwapper: swapper
         });

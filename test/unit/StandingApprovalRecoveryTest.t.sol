@@ -79,7 +79,6 @@ contract StandingApprovalRecoveryTest is Test {
             FEE_COLLECTOR,
             _feeSettings(),
             DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
-            DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK,
             address(this)
         );
 
@@ -92,7 +91,6 @@ contract StandingApprovalRecoveryTest is Test {
             FEE_COLLECTOR,
             _feeSettings(),
             DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
-            DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK,
             address(this)
         );
 

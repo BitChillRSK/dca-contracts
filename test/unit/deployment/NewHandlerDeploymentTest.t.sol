@@ -60,7 +60,6 @@ contract NewHandlerDeploymentTest is BaseDeploymentTest {
                         feeCollector: makeAddr(FEE_COLLECTOR_STRING),
                         feeSettings: feeSettings,
                         amountOutMinimumPercent: config.amountOutMinimumPercent,
-                        amountOutMinimumSafetyCheck: config.amountOutMinimumSafetyCheck,
                         initialOwner: operationsAdmin.owner()
                     })
                 ))

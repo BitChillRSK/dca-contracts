@@ -80,8 +80,7 @@ afterward.
 | Minimum purchase amount, per token | 25 tokens (`25e18` DOC and USDRIF, `25e6` USDT0) | `setTokenMinPurchaseAmount`: non-zero, no upper bound |
 | Minimum purchase period | 7 days | `setMinPurchasePeriod`: whole UTC days, at least one |
 | Schedules per user and token | 10 | `setMaxSchedulesPerToken`: any `uint16`. Zero blocks every new schedule; existing ones are unaffected |
-| Dex oracle floor | 97% of the oracle-implied output | `setAmountOutMinimumPercent`: between the safety check and 100% |
-| Dex floor safety check | 95% | `setAmountOutMinimumSafetyCheck`: at most the active floor |
+| Dex oracle floor | 97% of the oracle-implied output | `setAmountOutMinimumPercent`: between 95% (`MIN_AMOUNT_OUT_MINIMUM_PERCENT`, a constant) and 100% |
 | Protected purchase window | 5 blocks | None. It is a constant |
 
 Dex paths at deploy: USDT0 → WRBTC through the 0.30% pool; USDRIF → USDT0 (0.05%) → WRBTC (0.30%)
@@ -125,19 +124,19 @@ and DEX quotes for the other launch tokens, each with a configured tolerance. Th
 requirement; the contracts retain the zero-minimum option.
 Governance is a configuration trust boundary. Add-only handler assignment limits a bad future
 configuration to newly registered pairs/routes, but a malicious or misconfigured owner can still make
-unsafe fee, oracle, floor, path, or listing decisions within the explicit setter bounds. The Dex
-safety-check bound stops a single percentage change from widening the floor; it does not cover
-`setMocOracle`, which replaces the price the floor is computed from in one transaction with no bound
-against the previous oracle.
+unsafe fee, oracle, floor, path, or listing decisions within the explicit setter bounds. No owner call
+can set the Dex floor below 95% of the oracle-implied output. That bound does not cover `setMocOracle`,
+which replaces the price the floor is computed from in one transaction with no bound against the
+previous oracle.
 
 **Worst case for a swapper key, leaked or run under a bad policy.** The key can reopen the protected
 window in the block the previous one ends, submit a zero caller minimum, and activate any allowlisted
 Dex path. While windows are chained, users cannot pause or unpause, edit, delete, withdraw stablecoin
 or interest, or withdraw lending shares. Each Dex schedule that comes due in that time can be filled
-down to the oracle floor (3% below the oracle at launch settings), once per period. MoC routes have no
-pool to move. Principal cannot leave to anyone but its owner, and `revokeSwapper` ends it. An honest
-bot that reactivates after every failed purchase chains windows the same way, so the operating policy
-forbids automatic reactivation after a venue failure
+down to the oracle floor (3% below the oracle at launch settings, never more than 5%), once per
+period. MoC routes have no pool to move. Principal cannot leave to anyone but its owner, and
+`revokeSwapper` ends it. An honest bot that reactivates after every failed purchase chains windows
+the same way, so the operating policy forbids automatic reactivation after a venue failure
 ([R66](./docs/relaunch/R66-batch-row-front-running.md)). This is accepted without a mandatory gap
 between windows: a gap would give users a few open blocks they are unlikely to use before the Safe
 revokes the key, and a loose fill pays the key holder only if they also move the pool around the
@@ -361,7 +360,9 @@ pre-audit map and the Fizz fuzzing suite in `test/fizz/`. Kann Audits reviewed `
 issues #1–#26 in two rounds, in a private repository. BitChill's responses are posted on the issues,
 and the fixes and documentation lines they promise are
 [R121](./docs/relaunch/R121-kann-audit-followups.md) to
-[R125](./docs/relaunch/R125-kann-docs-and-consistency.md). Accepted risks are stated in this guide.
+[R125](./docs/relaunch/R125-kann-docs-and-consistency.md).
+[R126](./docs/relaunch/R126-dex-floor-cap.md) gives the Dex floor that #22 describes a fixed lower
+bound. Accepted risks are stated in this guide.
 
 Slither and Aderyn run on `src/` only (`make slither`, `make aderyn`). Slither exits non-zero because
 its triaged findings are kept visible instead of suppressed. Each detector's classification, false

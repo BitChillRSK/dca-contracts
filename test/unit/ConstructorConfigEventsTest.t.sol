@@ -89,7 +89,6 @@ contract ConstructorConfigEventsTest is Test {
                 FEE_COLLECTOR,
                 _feeSettings(),
                 DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
-                DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK,
                 address(this)
             )
         );
@@ -105,11 +104,6 @@ contract ConstructorConfigEventsTest is Test {
         (uint256 oldPercent, uint256 newPercent) = abi.decode(percent.data, (uint256, uint256));
         assertEq(oldPercent, 0);
         assertEq(newPercent, uniswap.getAmountOutMinimumPercent());
-        Vm.Log memory safety =
-            _onlyLog(logs, handler, IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumSafetyCheckUpdated.selector);
-        (uint256 oldSafety, uint256 newSafety) = abi.decode(safety.data, (uint256, uint256));
-        assertEq(oldSafety, 0);
-        assertEq(newSafety, uniswap.getAmountOutMinimumSafetyCheck());
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -132,7 +126,6 @@ contract ConstructorConfigEventsTest is Test {
             FEE_COLLECTOR,
             _feeSettings(),
             DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
-            DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK,
             address(this)
         );
     }
@@ -154,7 +147,6 @@ contract ConstructorConfigEventsTest is Test {
             FEE_COLLECTOR,
             _feeSettings(),
             DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
-            DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK,
             address(this)
         );
     }

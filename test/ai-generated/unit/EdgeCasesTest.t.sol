@@ -106,7 +106,6 @@ contract EdgeCasesTest is Test {
                 minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
             }),
             DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
-            DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK,
             address(this)
         );
 
@@ -131,10 +130,10 @@ contract EdgeCasesTest is Test {
         dex.setAmountOutMinimumPercent(1.1 ether);
     }
 
-    function test_setAmountOutMinimumSafetyCheck_reverts_when_too_high() public {
+    function test_setAmountOutMinimumPercent_reverts_below_the_fixed_bound() public {
         (TropykusHandlerDex dex,,,,,) = _deployDexHandler();
-        vm.expectRevert();
-        dex.setAmountOutMinimumSafetyCheck(1.1 ether);
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);
+        dex.setAmountOutMinimumPercent(0.5 ether);
     }
 
     function test_setMocOracle_reverts_on_zero_address() public {

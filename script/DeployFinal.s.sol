@@ -73,7 +73,6 @@ contract DeployFinal is DeployBase {
         address[] usdt0IntermediateTokens;
         uint24[] usdt0PoolFeeRates;
         uint256 amountOutMinimumPercent;
-        uint256 amountOutMinimumSafetyCheck;
         address feeCollector;
         address initialSwapper;
     }
@@ -154,7 +153,6 @@ contract DeployFinal is DeployBase {
         s_cfg.usdt0IntermediateTokens = config.usdt0IntermediateTokens;
         s_cfg.usdt0PoolFeeRates = config.usdt0PoolFeeRates;
         s_cfg.amountOutMinimumPercent = config.amountOutMinimumPercent;
-        s_cfg.amountOutMinimumSafetyCheck = config.amountOutMinimumSafetyCheck;
         s_cfg.feeCollector = config.feeCollector;
         s_cfg.initialSwapper = config.initialSwapper;
     }
@@ -188,7 +186,6 @@ contract DeployFinal is DeployBase {
                 s_cfg.feeCollector,
                 isUsdt0 ? _usdt0FeeSettings() : _docFeeSettings(),
                 s_cfg.amountOutMinimumPercent,
-                s_cfg.amountOutMinimumSafetyCheck,
                 owner
             )
         );
@@ -204,7 +201,6 @@ contract DeployFinal is DeployBase {
                 s_cfg.feeCollector,
                 isUsdt0 ? _usdt0FeeSettings() : _docFeeSettings(),
                 s_cfg.amountOutMinimumPercent,
-                s_cfg.amountOutMinimumSafetyCheck,
                 owner
             )
         );
@@ -256,7 +252,6 @@ contract DeployFinal is DeployBase {
             usdt0IntermediateTokens: usdt0Intermediate,
             usdt0PoolFeeRates: usdt0Fees,
             amountOutMinimumPercent: DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
-            amountOutMinimumSafetyCheck: DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK,
             feeCollector: getFeeCollector(environment),
             initialSwapper: vm.envAddress("INITIAL_SWAPPER")
         });
@@ -291,8 +286,7 @@ contract DeployFinal is DeployBase {
             mocOracle: 0xe2927A0620b82A66D67F678FC9b826B0E01B1bFD,
             operationsAdmin: address(0),
             dcaManager: address(0),
-            amountOutMinimumPercent: DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
-            amountOutMinimumSafetyCheck: DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK
+            amountOutMinimumPercent: DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT
         });
     }
 
@@ -312,7 +306,6 @@ contract DeployFinal is DeployBase {
         if (s_cfg.usdrifPoolFeeRates.length == 0) revert DeployFinal__IncompleteMap("usdrifPoolFeeRates");
         if (s_cfg.usdt0PoolFeeRates.length == 0) revert DeployFinal__IncompleteMap("usdt0PoolFeeRates");
         if (s_cfg.amountOutMinimumPercent == 0) revert DeployFinal__ZeroAddress("amountOutMinimumPercent");
-        if (s_cfg.amountOutMinimumSafetyCheck == 0) revert DeployFinal__ZeroAddress("amountOutMinimumSafetyCheck");
     }
 
     function _logStack() private view {

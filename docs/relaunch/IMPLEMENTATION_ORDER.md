@@ -689,7 +689,8 @@ slippage words and the handler ABI unchanged from mainnet-current: the swap-time
 `max(amountOutLowerBound, minRbtcOut)` into the router; `PurchaseRbtc` still checks measured output.
 Inside `[95%, 100%]` the owner retightens or widens the live floor in one call; widening *past* 95%
 takes two calls (lower the safety check first), which one Safe transaction can batch. Production Dex
-still sends a nonzero quote-derived `minRbtcOut`.
+still sends a nonzero quote-derived `minRbtcOut`. [R126](./R126-dex-floor-cap.md) replaces the
+safety check with a fixed 95% bound, so no owner call widens past it.
 
 Ask: none.
 
@@ -1599,6 +1600,13 @@ After R124. Last of the four Kann follow-up PRs: the documentation half of the r
 #16–#26, the security contact, an R66 amendment (D3, #17), and the `src/` consistency sweep listed in
 the spec. No ABI change; only the Dex setters' store-then-emit reorder changes runtime bytecode.
 Ask: none.
+
+### R126 - Fixed lower bound on the Dex oracle floor ([spec](./R126-dex-floor-cap.md))
+
+After R125 (owner request, 2026-11-25). The owner can still move the Dex oracle floor, but never
+below the constant `MIN_AMOUNT_OUT_MINIMUM_PERCENT` (95%), like the 5% fee cap. The owner-settable
+safety check, its setter, getter, event, two errors and constructor argument are removed. ABI and
+constructor change on the Dex leaves. Ask: none.
 
 ## Closed non-implementation decisions
 

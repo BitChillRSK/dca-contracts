@@ -37,12 +37,11 @@ abstract contract LayerBankHandlerDexHandler is Properties {
             _layerBankHandlerDex_restoreSwapRouterApproval(_dexHandler(handlerSeed));
         } else if (selector == 2) {
             address h = _dexHandler(handlerSeed);
-            uint256 safety = IPurchaseUniswap(h).getAmountOutMinimumSafetyCheck();
-            _layerBankHandlerDex_setAmountOutMinimumPercent(h, clampBetween(arg0, safety, 1 ether));
+            _layerBankHandlerDex_setAmountOutMinimumPercent(
+                h, clampBetween(arg0, MIN_AMOUNT_OUT_MINIMUM_PERCENT, 1 ether)
+            );
         } else if (selector == 3) {
-            address h = _dexHandler(handlerSeed);
-            uint256 percent = IPurchaseUniswap(h).getAmountOutMinimumPercent();
-            _layerBankHandlerDex_setAmountOutMinimumSafetyCheck(h, clampLte(arg0, percent));
+            _layerBankHandlerDex_setAmountOutMinimumPercentBelowTheBound(_dexHandler(handlerSeed), arg0);
         } else if (selector == 4) {
             _layerBankHandlerDex_setFeeCollector(_route(handlerSeed).handler, _collectorCandidate(arg0));
         } else if (selector == 5) {
@@ -125,11 +124,19 @@ abstract contract LayerBankHandlerDexHandler is Properties {
         IPurchaseUniswap(handler).setAmountOutMinimumPercent(amountOutMinimumPercent);
     }
 
-    function _layerBankHandlerDex_setAmountOutMinimumSafetyCheck(address handler, uint256 amountOutMinimumSafetyCheck)
+    /// @dev GL-23: the owner cannot set the floor below the fixed bound; the call reverts `TooLow`.
+    function _layerBankHandlerDex_setAmountOutMinimumPercentBelowTheBound(address handler, uint256 seed)
         internal
         asAdmin
     {
-        IPurchaseUniswap(handler).setAmountOutMinimumSafetyCheck(amountOutMinimumSafetyCheck);
+        try IPurchaseUniswap(handler).setAmountOutMinimumPercent(seed % MIN_AMOUNT_OUT_MINIMUM_PERCENT) {
+            t(false, "GL-23: floor set below the fixed bound");
+        } catch (bytes memory reason) {
+            t(
+                bytes4(reason) == IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector,
+                "GL-23: a floor below the bound must revert TooLow"
+            );
+        }
     }
 
     function _layerBankHandlerDex_setFeeCollector(address handler, address newCollector) internal asAdmin {
@@ -151,15 +158,11 @@ abstract contract LayerBankHandlerDexHandler is Properties {
 
     // ―――――――――――――――――――――――― Helpers ―――――――――――――――――――――――――――
 
-    /// @dev Whether selectors 2, 3, 4 or 6 would write the value already stored.
+    /// @dev Whether selectors 2, 4 or 6 would write the value already stored.
     function _unchangedSetting(uint8 selector, uint256 handlerSeed, uint256 arg0) internal returns (bool) {
         if (selector == 2) {
             IPurchaseUniswap h = IPurchaseUniswap(_dexHandler(handlerSeed));
-            return clampBetween(arg0, h.getAmountOutMinimumSafetyCheck(), 1 ether) == h.getAmountOutMinimumPercent();
-        }
-        if (selector == 3) {
-            IPurchaseUniswap h = IPurchaseUniswap(_dexHandler(handlerSeed));
-            return clampLte(arg0, h.getAmountOutMinimumPercent()) == h.getAmountOutMinimumSafetyCheck();
+            return clampBetween(arg0, MIN_AMOUNT_OUT_MINIMUM_PERCENT, 1 ether) == h.getAmountOutMinimumPercent();
         }
         if (selector == 4) {
             return _collectorCandidate(arg0) == IPurchaseFees(_route(handlerSeed).handler).getFeeCollector();

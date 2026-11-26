@@ -44,7 +44,6 @@ contract DexHelperConfig is Script {
         address mocProxy; // @notice: needed only for fork testing, where we need to call MoC::mintDoc()
         // Swap settings
         uint256 amountOutMinimumPercent;
-        uint256 amountOutMinimumSafetyCheck;
     }
 
     NetworkConfig internal activeNetworkConfig;
@@ -124,8 +123,7 @@ contract DexHelperConfig is Script {
             swapPoolFeeRates: poolFeeRates,
             mocOracle: 0x0000000000000000000000000000000000000000,
             mocProxy: 0x2820f6d4D199B8D8838A4B26F9917754B86a0c1F,
-            amountOutMinimumPercent: DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
-            amountOutMinimumSafetyCheck: DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK
+            amountOutMinimumPercent: DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT
         });
     }
 
@@ -180,8 +178,7 @@ contract DexHelperConfig is Script {
             swapPoolFeeRates: poolFeeRates,
             mocOracle: 0xe2927A0620b82A66D67F678FC9b826B0E01B1bFD,
             mocProxy: 0xf773B590aF754D597770937Fa8ea7AbDf2668370,
-            amountOutMinimumPercent: DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
-            amountOutMinimumSafetyCheck: DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK
+            amountOutMinimumPercent: DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT
         });
     }
 
@@ -284,8 +281,7 @@ contract DexHelperConfig is Script {
             swapPoolFeeRates: poolFeeRates,
             mocOracle: address(mockMocOracle),
             mocProxy: address(mockMocProxy),
-            amountOutMinimumPercent: DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
-            amountOutMinimumSafetyCheck: DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK
+            amountOutMinimumPercent: DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT
         });
     }
 

@@ -27,7 +27,7 @@ import "../Constants.sol";
  */
 contract PurchaseUniswapMinOutTest is Test {
     uint256 private constant PERCENT = DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT; // the live swap-time floor
-    uint256 private constant SAFETY = DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK; // the wall under it
+    uint256 private constant MIN_PERCENT = 0.95 ether; // `MIN_AMOUNT_OUT_MINIMUM_PERCENT`, the fixed bound under it
     uint256 private constant BTC_PRICE_18 = BTC_PRICE * 1e18; // what MockMocOracle publishes
     uint256 private constant USD_NOTIONAL = 25; // $25, the minimum purchase
     uint256 private constant BATCH_USD_NOTIONAL = 1000; // inside the fee bands the harness is built with
@@ -246,8 +246,7 @@ contract PurchaseUniswapMinOutTest is Test {
         _buyOne(six, grossSix, floor + 1);
     }
 
-    /// @dev The owner may retighten the live floor without touching the wall, and the swap follows it
-    ///      immediately. This is the knob that exists so the wall never has to move.
+    /// @dev The owner may retighten the live floor, and the swap follows it immediately.
     function testOwnerCanRetightenTheFloorAndTheSwapFollows() public {
         MinOutHarness harness = _deployHarness(18);
         uint256 gross = _fundedGross(harness, 18);
@@ -262,33 +261,31 @@ contract PurchaseUniswapMinOutTest is Test {
         swapRouter.setAmountOut(tightFloor - 1);
         vm.expectRevert(bytes("Too little received"));
         _buyOne(harness, gross, NO_MIN_RBTC_OUT);
-
-        assertEq(harness.getAmountOutMinimumSafetyCheck(), SAFETY, "retightening the floor must not move the wall");
     }
 
-    /// @dev The wall is what a compromised swapper cannot get under. Even after the owner widens the floor
-    ///      as far as one transaction allows, the swap still cannot pay less than the safety check implies.
-    function testTheWallBoundsHowFarOneOwnerTransactionCanWiden() public {
+    /// @dev The fixed bound is what a compromised swapper cannot get under. Even after the owner widens
+    ///      the floor as far as the code allows, the swap still cannot pay less than the bound implies.
+    function testTheFixedBoundLimitsHowFarTheOwnerCanWiden() public {
         MinOutHarness harness = _deployHarness(18);
         uint256 gross = _fundedGross(harness, 18);
 
         vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);
-        harness.setAmountOutMinimumPercent(SAFETY - 1);
+        harness.setAmountOutMinimumPercent(MIN_PERCENT - 1);
 
-        // The loosest reachable floor in one transaction is the wall itself.
-        harness.setAmountOutMinimumPercent(SAFETY);
-        uint256 wallFloor = harness.getAmountOutMinimum(gross);
+        // The loosest reachable floor is the bound itself.
+        harness.setAmountOutMinimumPercent(MIN_PERCENT);
+        uint256 boundFloor = harness.getAmountOutMinimum(gross);
 
-        swapRouter.setAmountOut(wallFloor - 1);
+        swapRouter.setAmountOut(boundFloor - 1);
         vm.expectRevert(bytes("Too little received"));
         _buyOne(harness, gross, 1); // a compromised swapper asking for one wei
 
-        swapRouter.setAmountOut(wallFloor);
+        swapRouter.setAmountOut(boundFloor);
         _buyOne(harness, gross, 1);
         assertEq(
             harness.getAccumulatedRbtcBalance(BUYER),
-            _buyerCredit(harness, gross, wallFloor),
-            "the wall is the worst reachable fill"
+            _buyerCredit(harness, gross, boundFloor),
+            "the bound is the worst reachable fill"
         );
     }
 
@@ -336,7 +333,7 @@ contract PurchaseUniswapMinOutTest is Test {
             minFeeRate: MIN_FEE_RATE, maxFeeRate: MAX_FEE_RATE_TEST, feePurchaseLowerBound: FEE_PURCHASE_LOWER_BOUND
         });
 
-        return new MinOutHarness(stablecoin, feeSettings, uniswapSettings, PERCENT, SAFETY);
+        return new MinOutHarness(stablecoin, feeSettings, uniswapSettings, PERCENT);
     }
 }
 
@@ -357,8 +354,7 @@ contract MinOutHarness is PurchaseTokenBase, PurchaseUniswap {
         MockStablecoinWithDecimals token,
         IPurchaseFees.FeeSettings memory feeSettings,
         UniswapSettings memory uniswapSettings,
-        uint256 amountOutMinimumPercent,
-        uint256 amountOutMinimumSafetyCheck
+        uint256 amountOutMinimumPercent
     )
         PurchaseTokenBase(token)
         DcaManagerAccessControl(msg.sender)
@@ -366,7 +362,6 @@ contract MinOutHarness is PurchaseTokenBase, PurchaseUniswap {
             uniswapSettings,
             FeeConfig({feeCollector: address(0xFEE), feeSettings: feeSettings}),
             amountOutMinimumPercent,
-            amountOutMinimumSafetyCheck,
             msg.sender
         )
     {}

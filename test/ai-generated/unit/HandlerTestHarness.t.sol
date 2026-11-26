@@ -358,11 +358,9 @@ abstract contract HandlerTestHarness is Test {
 
         // Test DEX configuration getters
         uint256 minPercent = dexHandler.getAmountOutMinimumPercent();
-        uint256 safetyCheck = dexHandler.getAmountOutMinimumSafetyCheck();
         bytes memory swapPath = dexHandler.getSwapPath();
 
-        assertGt(safetyCheck, 0);
-        assertLe(safetyCheck, minPercent); // the wall sits at or below the live floor
+        assertLe(0.95 ether, minPercent); // the fixed bound sits at or below the live floor
         assertLe(minPercent, 1 ether);
         assertGt(swapPath.length, 0);
         uint256 packed;
@@ -393,32 +391,11 @@ abstract contract HandlerTestHarness is Test {
         vm.prank(OWNER);
         dexHandler.setAmountOutMinimumPercent(1.01 ether);
 
-        // Below the safety-check wall.
-        uint256 safetyCheck = dexHandler.getAmountOutMinimumSafetyCheck();
-        vm.expectRevert();
+        // Below the fixed bound.
+        uint256 bound = 0.95 ether;
+        vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);
         vm.prank(OWNER);
-        dexHandler.setAmountOutMinimumPercent(safetyCheck - 1);
-    }
-
-    function test_handler_dex_setAmountOutMinimumSafetyCheck() public {
-        if (!supportsDex) return;
-
-        IPurchaseUniswap dexHandler = IPurchaseUniswap(address(handler));
-
-        vm.prank(OWNER);
-        dexHandler.setAmountOutMinimumSafetyCheck(0.96 ether);
-
-        assertEq(dexHandler.getAmountOutMinimumSafetyCheck(), 0.96 ether);
-    }
-
-    function test_handler_dex_setAmountOutMinimumSafetyCheck_reverts_invalidRange() public {
-        if (!supportsDex) return;
-
-        IPurchaseUniswap dexHandler = IPurchaseUniswap(address(handler));
-
-        vm.expectRevert();
-        vm.prank(OWNER);
-        dexHandler.setAmountOutMinimumSafetyCheck(1.01 ether);
+        dexHandler.setAmountOutMinimumPercent(bound - 1);
     }
 
     /*//////////////////////////////////////////////////////////////

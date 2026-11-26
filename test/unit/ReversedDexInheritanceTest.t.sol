@@ -27,7 +27,6 @@ contract ReversedIdleHandlerDex is PurchaseUniswap, IdleHandler {
         address feeCollector,
         FeeSettings memory feeSettings,
         uint256 amountOutMinimumPercent,
-        uint256 amountOutMinimumSafetyCheck,
         address initialOwner
     )
         IdleHandler(dcaManager, stablecoin)
@@ -35,7 +34,6 @@ contract ReversedIdleHandlerDex is PurchaseUniswap, IdleHandler {
             uniswapSettings,
             FeeConfig({feeCollector: feeCollector, feeSettings: feeSettings}),
             amountOutMinimumPercent,
-            amountOutMinimumSafetyCheck,
             initialOwner
         )
     {}
@@ -71,7 +69,6 @@ contract ReversedDexInheritanceTest is Test {
             address(0xFEE),
             feeSettings,
             DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT,
-            DEFAULT_AMOUNT_OUT_MINIMUM_SAFETY_CHECK,
             address(this)
         );
 
