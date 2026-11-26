@@ -335,6 +335,9 @@ Other deliberate availability trade-offs:
   This upgrade assumption is separate from current half-up mint rounding: a fresh deposit can mint
   fewer shares than a nominal full-principal purchase requires. The per-row share clamp and adjusted
   allocation weights handle that current rounding gap without relaxing the burn check.
+  [The share-exit rounding example](./docs/relaunch/LAYERBANK_ROUNDING.md) records block 9443471,
+  distinguishes a forfeited handler share from a recoverable user-held Pool remainder, and derives
+  the two-deposit cash bound. The fork test completes the user's redemption and checks both balances.
 - Third-party incentive campaigns on a lending market (for example Merkl) are not claimed or
   distributed. Handlers pay out the market's native interest only.
 - The bot must quote, simulate, group rows by handler, respect the protected-window workflow, and retry
