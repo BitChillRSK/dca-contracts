@@ -1,6 +1,6 @@
 # R128 — Lending rounding and period invariant tests
 
-Assigned follow-up to PR #204. This test and documentation change preserves production behavior.
+Status: **implemented; [PR #205](https://github.com/BitChillRSK/dca-contracts/pull/205) open**. Assigned follow-up to PR #204. This test and documentation change preserves production behavior.
 
 ## Scope
 

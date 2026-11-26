@@ -72,6 +72,8 @@ decided against). No further re-judgement PRs.
 
 ## Status
 
+- Implemented; open for review: [R128](./R128-lending-rounding-and-period-tests.md), GitHub [#205](https://github.com/BitChillRSK/dca-contracts/pull/205), stacked on #204. Next unassigned: none.
+
 - Implemented; open for review: [R127-setter-names.md](./R127-setter-names.md), GitHub [#204](https://github.com/BitChillRSK/dca-contracts/pull/204), stacked on updated [#203](https://github.com/BitChillRSK/dca-contracts/pull/203) (`fa838c6e`). All configuration setters use `set…` functions and `…Set` events. Next unassigned: none.
 
 - Merged: [R122-kann-lending-withdrawals.md](./R122-kann-lending-withdrawals.md) (GitHub [#199](https://github.com/BitChillRSK/dca-contracts/pull/199)), Kann #14, #19 and #20 item 1.
