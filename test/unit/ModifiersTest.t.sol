@@ -12,7 +12,7 @@ import "../Constants.sol";
 
 contract ModifiersTest is DcaDappTest {
     // Events
-    event DcaManager__MinPurchasePeriodModified(uint256 newMinPurchasePeriod);
+    event DcaManager__MinPurchasePeriodSet(uint256 newMinPurchasePeriod);
 
     /// @dev Pre-R46 `setOperationsAdmin(address)` selector. Kept as a literal so the test
     ///      still compiles after the function is deleted.
@@ -81,7 +81,7 @@ contract ModifiersTest is DcaDappTest {
         assertEq(minPurchasePeriodBefore, minPurchasePeriodAfter);
         vm.prank(OWNER); // Owner can
         vm.expectEmit(true, true, true, true);
-        emit DcaManager__MinPurchasePeriodModified(newMinPurchasePeriod);
+        emit DcaManager__MinPurchasePeriodSet(newMinPurchasePeriod);
         dcaManager.setMinPurchasePeriod(newMinPurchasePeriod);
         minPurchasePeriodAfter = dcaManager.getMinPurchasePeriod();
         assertEq(minPurchasePeriodAfter, newMinPurchasePeriod);

@@ -188,6 +188,9 @@ Limits of this run:
 
 [`fizz_data/report.md`](../../fizz_data/report.md) has the full results, coverage per contract, and
 next steps. [`fizz_data/property-plan.md`](../../fizz_data/property-plan.md) gives each property's
-source and reasoning. The Medusa corpus, the coverage HTML and the compile caches are not committed.
+source and reasoning. The rest of `fizz_data/` is the generator's record of this run: its ABI inventory and entry-point
+selection describe the scanned `src/` and do not follow later ABI changes, so a new harness
+generation starts from a fresh discovery. The Medusa corpus, the coverage HTML and the compile caches
+are not committed.
 To rerun, run `medusa fuzz` from the repository root, or
 `forge test --match-contract FoundryTester` for the Foundry tests.

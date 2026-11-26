@@ -116,7 +116,7 @@ contract SchedulePackingTest is DcaDappTest {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
 
         vm.startPrank(USER);
-        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, _maxWholeDayUint32Period());
+        dcaManager.setPurchasePeriod(address(stablecoin), scheduleId, _maxWholeDayUint32Period());
         vm.stopPrank();
 
         vm.warp(type(uint48).max);
@@ -298,7 +298,7 @@ contract SchedulePackingTest is DcaDappTest {
         assertEq(stablecoin.balanceOf(USER), userBefore);
     }
 
-    function testUpdatePurchaseAmountAcceptsUint96MaxWhenBalanceAllows() external {
+    function testSetPurchaseAmountAcceptsUint96MaxWhenBalanceAllows() external {
         if (block.chainid != ANVIL_CHAIN_ID) return; // live DOC has no public mint for this size
 
         uint256 maxAmount = type(uint96).max;
@@ -309,43 +309,43 @@ contract SchedulePackingTest is DcaDappTest {
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), extra);
         dcaManager.depositToken(address(stablecoin), scheduleId, extra);
-        dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, maxAmount);
+        dcaManager.setPurchaseAmount(address(stablecoin), scheduleId, maxAmount);
         vm.stopPrank();
 
         assertEq(scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).purchaseAmount, maxAmount);
     }
 
-    function testUpdatePurchaseAmountRevertsUint96MaxPlusOne() external {
+    function testSetPurchaseAmountRevertsUint96MaxPlusOne() external {
         uint256 overflowing = uint256(type(uint96).max) + 1;
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         uint256 amountBefore = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).purchaseAmount;
 
         vm.prank(USER);
         vm.expectRevert(_safeCastOverflow(96, overflowing));
-        dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, overflowing);
+        dcaManager.setPurchaseAmount(address(stablecoin), scheduleId, overflowing);
 
         assertEq(scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).purchaseAmount, amountBefore);
     }
 
-    function testUpdatePurchasePeriodAcceptsWidestWholeDayPeriod() external {
+    function testSetPurchasePeriodAcceptsWidestWholeDayPeriod() external {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
 
         vm.prank(USER);
-        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, _maxWholeDayUint32Period());
+        dcaManager.setPurchasePeriod(address(stablecoin), scheduleId, _maxWholeDayUint32Period());
 
         assertEq(
             scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).purchasePeriod, _maxWholeDayUint32Period()
         );
     }
 
-    function testUpdatePurchasePeriodRevertsAboveUint32() external {
+    function testSetPurchasePeriodRevertsAboveUint32() external {
         uint256 overflowing = _maxWholeDayUint32Period() + 1 days;
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         uint256 periodBefore = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).purchasePeriod;
 
         vm.prank(USER);
         vm.expectRevert(_safeCastOverflow(32, overflowing));
-        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, overflowing);
+        dcaManager.setPurchasePeriod(address(stablecoin), scheduleId, overflowing);
 
         assertEq(scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).purchasePeriod, periodBefore);
     }
@@ -385,7 +385,7 @@ contract SchedulePackingTest is DcaDappTest {
         dcaManager.setMinPurchasePeriod(1 days);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         vm.prank(USER);
-        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, 1 days);
+        dcaManager.setPurchasePeriod(address(stablecoin), scheduleId, 1 days);
 
         vm.warp(type(uint48).max);
         super.buyRbtcOne(scheduleId);
@@ -438,10 +438,10 @@ contract SchedulePackingTest is DcaDappTest {
         vm.expectRevert(
             abi.encodeWithSelector(IDcaManager.DcaManager__InexistentSchedule.selector, address(stablecoin), deletedId)
         );
-        dcaManager.updatePurchaseAmount(address(stablecoin), deletedId, MIN_PURCHASE_AMOUNT);
+        dcaManager.setPurchaseAmount(address(stablecoin), deletedId, MIN_PURCHASE_AMOUNT);
 
         vm.prank(USER);
-        dcaManager.updatePurchaseAmount(address(stablecoin), survivorId, MIN_PURCHASE_AMOUNT);
+        dcaManager.setPurchaseAmount(address(stablecoin), survivorId, MIN_PURCHASE_AMOUNT);
         assertEq(scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).purchaseAmount, MIN_PURCHASE_AMOUNT);
     }
 
@@ -490,7 +490,7 @@ contract SchedulePackingTest is DcaDappTest {
         if (distinctAmount < MIN_PURCHASE_AMOUNT) distinctAmount = MIN_PURCHASE_AMOUNT;
 
         vm.prank(USER);
-        dcaManager.updatePurchaseAmount(address(stablecoin), lastId, distinctAmount);
+        dcaManager.setPurchaseAmount(address(stablecoin), lastId, distinctAmount);
 
         super.buyRbtcOne(lastId);
 

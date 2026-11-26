@@ -25,8 +25,8 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
     uint256 private constant IDLE_ORACLE_SLOT = 5;
     uint256 private constant LENDING_ORACLE_SLOT = 6;
 
-    event PurchaseUniswap__AmountOutMinimumPercentUpdated(uint256 oldValue, uint256 newValue);
-    event PurchaseUniswap__OracleUpdated(address indexed oldOracle, address indexed newOracle);
+    event PurchaseUniswap__AmountOutMinimumPercentSet(uint256 oldValue, uint256 newValue);
+    event PurchaseUniswap__OracleSet(address indexed oldOracle, address indexed newOracle);
     event PurchaseUniswap__NewPathSet(address[] intermediateTokens, uint24[] poolFeeRates, bytes newPath);
 
     function setUp() public override {
@@ -66,7 +66,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
 
         uint256 newPercent = DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT * 999 / 1000;
         vm.expectEmit(true, true, true, true);
-        emit PurchaseUniswap__AmountOutMinimumPercentUpdated(initialPercent, newPercent);
+        emit PurchaseUniswap__AmountOutMinimumPercentSet(initialPercent, newPercent);
         vm.prank(OWNER);
         dex.setAmountOutMinimumPercent(newPercent);
         assertEq(dex.getAmountOutMinimumPercent(), newPercent, "Swap-time floor should be updated");
@@ -98,13 +98,13 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         uint256 bound = 0.95 ether;
 
         vm.expectEmit(true, true, true, true);
-        emit PurchaseUniswap__AmountOutMinimumPercentUpdated(percentBefore, bound);
+        emit PurchaseUniswap__AmountOutMinimumPercentSet(percentBefore, bound);
         vm.prank(OWNER);
         dex.setAmountOutMinimumPercent(bound);
         assertEq(dex.getAmountOutMinimumPercent(), bound);
 
         vm.expectEmit(true, true, true, true);
-        emit PurchaseUniswap__AmountOutMinimumPercentUpdated(bound, 1 ether);
+        emit PurchaseUniswap__AmountOutMinimumPercentSet(bound, 1 ether);
         vm.prank(OWNER);
         dex.setAmountOutMinimumPercent(1 ether);
         assertEq(dex.getAmountOutMinimumPercent(), 1 ether);
@@ -130,7 +130,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
 
         // Expect the event with the correct parameters
         vm.expectEmit(true, true, false, false);
-        emit PurchaseUniswap__OracleUpdated(oldOracleAddress, address(newMocOracle));
+        emit PurchaseUniswap__OracleSet(oldOracleAddress, address(newMocOracle));
 
         // Update the oracle
         vm.prank(OWNER);
@@ -197,7 +197,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         vm.startPrank(USER);
         stablecoin.approve(address(stablecoinHandler), AMOUNT_TO_DEPOSIT);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
-        dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, AMOUNT_TO_SPEND);
+        dcaManager.setPurchaseAmount(address(stablecoin), scheduleId, AMOUNT_TO_SPEND);
         vm.stopPrank();
 
         // Create a mock oracle that returns invalid prices

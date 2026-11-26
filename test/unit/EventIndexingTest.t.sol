@@ -97,8 +97,8 @@ contract EventIndexingTest is DcaDappTest {
         vm.recordLogs();
         depositStablecoin();
         vm.startPrank(USER);
-        dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, AMOUNT_TO_SPEND);
-        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, MIN_PURCHASE_PERIOD);
+        dcaManager.setPurchaseAmount(address(stablecoin), scheduleId, AMOUNT_TO_SPEND);
+        dcaManager.setPurchasePeriod(address(stablecoin), scheduleId, MIN_PURCHASE_PERIOD);
         dcaManager.setSchedulePaused(address(stablecoin), scheduleId, true);
         dcaManager.setSchedulePaused(address(stablecoin), scheduleId, false);
         vm.stopPrank();
@@ -187,8 +187,8 @@ contract EventIndexingTest is DcaDappTest {
     /// @dev Extra topics beyond the signature: every scalar `address` and `uint64 scheduleId`, and nothing else.
     function _expectedExtraTopics(bytes32 sig) private pure returns (bool known, uint256 extra) {
         if (sig == keccak256("DcaManager__TokenBalanceUpdated(address,uint64,uint256)")) return (true, 2);
-        if (sig == keccak256("DcaManager__PurchaseAmountUpdated(address,uint64,uint256,uint256)")) return (true, 2);
-        if (sig == keccak256("DcaManager__PurchasePeriodUpdated(address,uint64,uint256,uint256)")) return (true, 2);
+        if (sig == keccak256("DcaManager__PurchaseAmountSet(address,uint64,uint256,uint256)")) return (true, 2);
+        if (sig == keccak256("DcaManager__PurchasePeriodSet(address,uint64,uint256,uint256)")) return (true, 2);
         if (sig == keccak256("DcaManager__DcaScheduleCreated(address,address,uint64,uint256,uint256,uint256,uint256)"))
         {
             return (true, 3);
@@ -196,8 +196,8 @@ contract EventIndexingTest is DcaDappTest {
         if (sig == keccak256("DcaManager__SchedulePauseSet(address,uint64,bool)")) return (true, 2);
         if (sig == keccak256("DcaManager__ProtectedPurchaseWindowActivated(address,uint256)")) return (true, 1);
         if (sig == keccak256("DcaManager__DcaScheduleDeleted(address,address,uint64,uint256)")) return (true, 3);
-        if (sig == keccak256("DcaManager__MaxSchedulesPerTokenModified(uint256)")) return (true, 0);
-        if (sig == keccak256("DcaManager__MinPurchasePeriodModified(uint256)")) return (true, 0);
+        if (sig == keccak256("DcaManager__MaxSchedulesPerTokenSet(uint256)")) return (true, 0);
+        if (sig == keccak256("DcaManager__MinPurchasePeriodSet(uint256)")) return (true, 0);
         if (sig == keccak256("DcaManager__TokenMinPurchaseAmountSet(address,uint256)")) return (true, 1);
         if (sig == keccak256("LendingHandler__UserSharesUpdated(address,uint256,uint256)")) return (true, 1);
         if (sig == keccak256("LendingHandler__SharesRedeemed(address,uint256,uint256)")) return (true, 1);
@@ -223,8 +223,8 @@ contract EventIndexingTest is DcaDappTest {
         if (sig == keccak256("PurchaseFees__FeeCollectorAddressSet(address)")) return (true, 1);
         if (sig == keccak256("PurchaseFees__FeeCredited(address,uint256,uint256)")) return (true, 1);
         if (sig == keccak256("PurchaseUniswap__NewPathSet(address[],uint24[],bytes)")) return (true, 0);
-        if (sig == keccak256("PurchaseUniswap__AmountOutMinimumPercentUpdated(uint256,uint256)")) return (true, 0);
-        if (sig == keccak256("PurchaseUniswap__OracleUpdated(address,address)")) return (true, 2);
+        if (sig == keccak256("PurchaseUniswap__AmountOutMinimumPercentSet(uint256,uint256)")) return (true, 0);
+        if (sig == keccak256("PurchaseUniswap__OracleSet(address,address)")) return (true, 2);
         if (sig == OWNERSHIP_TRANSFERRED) return (true, 2);
         if (sig == OWNERSHIP_TRANSFER_STARTED) return (true, 2);
         return (false, 0);

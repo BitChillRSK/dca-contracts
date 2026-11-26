@@ -108,8 +108,8 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
             maxSchedulesPerToken: maxSchedulesPerToken.toUint16(),
             scheduleNonce: 0
         });
-        emit DcaManager__MinPurchasePeriodModified(minPurchasePeriod);
-        emit DcaManager__MaxSchedulesPerTokenModified(maxSchedulesPerToken);
+        emit DcaManager__MinPurchasePeriodSet(minPurchasePeriod);
+        emit DcaManager__MaxSchedulesPerTokenSet(maxSchedulesPerToken);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -184,7 +184,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
     }
 
     /// @inheritdoc IDcaManager
-    function updatePurchaseAmount(address token, uint64 scheduleId, uint256 newPurchaseAmount)
+    function setPurchaseAmount(address token, uint64 scheduleId, uint256 newPurchaseAmount)
         external
         override
         whenUserMutationsAllowed
@@ -195,11 +195,11 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         _validatePurchaseAmount(token, newAmount);
         uint256 previousPurchaseAmount = dcaSchedule.purchaseAmount;
         dcaSchedule.purchaseAmount = newAmount;
-        emit DcaManager__PurchaseAmountUpdated(msg.sender, scheduleId, previousPurchaseAmount, newPurchaseAmount);
+        emit DcaManager__PurchaseAmountSet(msg.sender, scheduleId, previousPurchaseAmount, newPurchaseAmount);
     }
 
     /// @inheritdoc IDcaManager
-    function updatePurchasePeriod(address token, uint64 scheduleId, uint256 newPurchasePeriod)
+    function setPurchasePeriod(address token, uint64 scheduleId, uint256 newPurchasePeriod)
         external
         override
         whenUserMutationsAllowed
@@ -209,7 +209,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
         _validatePurchasePeriod(newPurchasePeriod, s_protocolSettings.minPurchasePeriod);
         uint256 previousPurchasePeriod = dcaSchedule.purchasePeriod;
         dcaSchedule.purchasePeriod = newPurchasePeriod.toUint32();
-        emit DcaManager__PurchasePeriodUpdated(msg.sender, scheduleId, previousPurchasePeriod, newPurchasePeriod);
+        emit DcaManager__PurchasePeriodSet(msg.sender, scheduleId, previousPurchasePeriod, newPurchasePeriod);
     }
 
     /// @inheritdoc IDcaManager
@@ -412,7 +412,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
             revert DcaManager__MinPurchasePeriodUnchanged(minPurchasePeriod);
         }
         s_protocolSettings.minPurchasePeriod = minPurchasePeriod.toUint32();
-        emit DcaManager__MinPurchasePeriodModified(minPurchasePeriod);
+        emit DcaManager__MinPurchasePeriodSet(minPurchasePeriod);
     }
 
     /// @inheritdoc IDcaManager
@@ -421,7 +421,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
             revert DcaManager__MaxSchedulesPerTokenUnchanged(maxSchedulesPerToken);
         }
         s_protocolSettings.maxSchedulesPerToken = maxSchedulesPerToken.toUint16();
-        emit DcaManager__MaxSchedulesPerTokenModified(maxSchedulesPerToken);
+        emit DcaManager__MaxSchedulesPerTokenSet(maxSchedulesPerToken);
     }
 
     /// @inheritdoc IDcaManager

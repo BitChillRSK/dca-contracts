@@ -57,13 +57,13 @@ contract ProtectedPurchaseWindowTest is DcaDappTest {
             abi.encodeWithSelector(IDcaManager.DcaManager__UserMutationsLocked.selector, allowedFromBlock);
 
         _assertUserCallRevertsLocked(
-            abi.encodeCall(IDcaManager.updatePurchaseAmount, (address(stablecoin), scheduleId, AMOUNT_TO_SPEND)),
+            abi.encodeCall(IDcaManager.setPurchaseAmount, (address(stablecoin), scheduleId, AMOUNT_TO_SPEND)),
             expectedRevert
         );
 
         vm.roll(allowedFromBlock - 1);
         _assertUserCallRevertsLocked(
-            abi.encodeCall(IDcaManager.updatePurchasePeriod, (address(stablecoin), scheduleId, MIN_PURCHASE_PERIOD)),
+            abi.encodeCall(IDcaManager.setPurchasePeriod, (address(stablecoin), scheduleId, MIN_PURCHASE_PERIOD)),
             expectedRevert
         );
         _assertUserCallRevertsLocked(
@@ -93,7 +93,7 @@ contract ProtectedPurchaseWindowTest is DcaDappTest {
 
         vm.roll(allowedFromBlock);
         vm.prank(USER);
-        dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, AMOUNT_TO_SPEND);
+        dcaManager.setPurchaseAmount(address(stablecoin), scheduleId, AMOUNT_TO_SPEND);
     }
 
     function testActivationCannotBeExtendedWhileLiveButCanReopenAfterExpiry() external {
@@ -121,7 +121,7 @@ contract ProtectedPurchaseWindowTest is DcaDappTest {
 
         vm.expectRevert(abi.encodeWithSelector(IDcaManager.DcaManager__UserMutationsLocked.selector, allowedFromBlock));
         vm.prank(USER);
-        dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, AMOUNT_TO_SPEND * 2);
+        dcaManager.setPurchaseAmount(address(stablecoin), scheduleId, AMOUNT_TO_SPEND * 2);
 
         buyRbtcOne(scheduleId);
         assertLt(scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).tokenBalance, balanceBefore);

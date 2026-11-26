@@ -197,8 +197,8 @@ contract DepositsPauseTest is DcaDappTest {
         uint256 newPurchasePeriod = MIN_PURCHASE_PERIOD * 2;
 
         vm.startPrank(USER);
-        dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, newPurchaseAmount);
-        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, newPurchasePeriod);
+        dcaManager.setPurchaseAmount(address(stablecoin), scheduleId, newPurchaseAmount);
+        dcaManager.setPurchasePeriod(address(stablecoin), scheduleId, newPurchasePeriod);
         vm.stopPrank();
 
         IDcaManager.DcaSchedule memory schedule = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);

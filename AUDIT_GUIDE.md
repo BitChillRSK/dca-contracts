@@ -246,7 +246,7 @@ several times that day if the anchor remains sufficiently old. Each purchase sti
 authorised swapper transaction; edits do not execute purchases. The bot runs weekly at launch.
 One successful purchase per schedule per bot cycle prevents the reported repeated-execution sequence;
 cron frequency alone does not prove that execution rule. The user funds each purchase and pays its fee.
-`updatePurchasePeriod` is blocked during a protected window like every other edit.
+`setPurchasePeriod` is blocked during a protected window like every other edit.
 This is accepted, not enforced away: refusing a period that makes the schedule immediately due would
 also refuse ordinary mid-cycle shortening.
 

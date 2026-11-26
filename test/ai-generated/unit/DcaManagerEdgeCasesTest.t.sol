@@ -406,7 +406,7 @@ contract DcaManagerEdgeCasesTest is Test {
                            SCHEDULE MODIFICATION EDGE CASES
     //////////////////////////////////////////////////////////////*/
 
-    function test_updatePurchaseAmount_reverts_zeroAmount() public {
+    function test_setPurchaseAmount_reverts_zeroAmount() public {
         // Create a schedule first
         vm.prank(USER);
         dcaManager.createDcaSchedule(
@@ -422,17 +422,17 @@ contract DcaManagerEdgeCasesTest is Test {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), 0);
         vm.expectRevert();
         vm.prank(USER);
-        dcaManager.updatePurchaseAmount(address(stablecoin), scheduleId, 0);
+        dcaManager.setPurchaseAmount(address(stablecoin), scheduleId, 0);
     }
 
-    function test_updatePurchaseAmount_reverts_inexistentScheduleId() public {
+    function test_setPurchaseAmount_reverts_inexistentScheduleId() public {
         uint64 fakeScheduleId = UNUSED_SCHEDULE_ID;
         vm.expectRevert();
         vm.prank(USER);
-        dcaManager.updatePurchaseAmount(address(stablecoin), fakeScheduleId, 100 ether);
+        dcaManager.setPurchaseAmount(address(stablecoin), fakeScheduleId, 100 ether);
     }
 
-    function test_updatePurchasePeriod_reverts_invalidPeriod() public {
+    function test_setPurchasePeriod_reverts_invalidPeriod() public {
         // Create a schedule first
         vm.prank(USER);
         dcaManager.createDcaSchedule(
@@ -448,7 +448,7 @@ contract DcaManagerEdgeCasesTest is Test {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), 0);
         vm.expectRevert(IDcaManager.DcaManager__PurchasePeriodMustBeAtLeastMinimum.selector);
         vm.prank(USER);
-        dcaManager.updatePurchasePeriod(address(stablecoin), scheduleId, MIN_PURCHASE_PERIOD - 1);
+        dcaManager.setPurchasePeriod(address(stablecoin), scheduleId, MIN_PURCHASE_PERIOD - 1);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -550,11 +550,11 @@ contract DcaManagerEdgeCasesTest is Test {
 
         vm.expectRevert();
         vm.prank(USER);
-        dcaManager.updatePurchaseAmount(address(stablecoin), fakeScheduleId, 100 ether);
+        dcaManager.setPurchaseAmount(address(stablecoin), fakeScheduleId, 100 ether);
 
         vm.expectRevert();
         vm.prank(USER);
-        dcaManager.updatePurchasePeriod(address(stablecoin), fakeScheduleId, MIN_PURCHASE_PERIOD);
+        dcaManager.setPurchasePeriod(address(stablecoin), fakeScheduleId, MIN_PURCHASE_PERIOD);
     }
 
     function testFuzz_invalidAmounts(uint256 seed) public {

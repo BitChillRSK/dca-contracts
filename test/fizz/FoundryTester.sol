@@ -206,8 +206,8 @@ contract FoundryTester is Test, Handlers {
 
         // Rewired edit / funding wrappers, including a top-up that funds another purchase.
         setCurrentActor(2);
-        dcaManager_updatePurchaseAmount_clamped(0, 120 ether);
-        dcaManager_updatePurchasePeriod_clamped(1, 3);
+        dcaManager_setPurchaseAmount_clamped(0, 120 ether);
+        dcaManager_setPurchasePeriod_clamped(1, 3);
         dcaManager_setSchedulePaused_clamped(2, true);
         dcaManager_setSchedulePaused_clamped(2, true);
         dcaManager_setSchedulePaused_clamped(2, false);

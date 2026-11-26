@@ -621,7 +621,7 @@ abstract contract AdversarialHandler is DcaManagerHandler {
         vm.prank(d.user);
         if (which == 0) {
             op = OP_UPDATE_AMOUNT;
-            try dcaManager.updatePurchaseAmount(r.token, id, d.purchaseAmount) {
+            try dcaManager.setPurchaseAmount(r.token, id, d.purchaseAmount) {
                 ok = true;
             } catch (bytes memory e) {
                 err = e;
@@ -826,13 +826,13 @@ abstract contract AdversarialHandler is DcaManagerHandler {
                 err = e;
             }
         } else if (which == 5) {
-            try dcaManager.updatePurchaseAmount(s.token, s.scheduleId, amount) {
+            try dcaManager.setPurchaseAmount(s.token, s.scheduleId, amount) {
                 ok = true;
             } catch (bytes memory e) {
                 err = e;
             }
         } else if (which == 6) {
-            try dcaManager.updatePurchasePeriod(s.token, s.scheduleId, period) {
+            try dcaManager.setPurchasePeriod(s.token, s.scheduleId, period) {
                 ok = true;
             } catch (bytes memory e) {
                 err = e;
