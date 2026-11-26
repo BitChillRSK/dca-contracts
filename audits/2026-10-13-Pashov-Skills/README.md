@@ -42,7 +42,8 @@ The orchestrator applied the skill's gates with these rules in all three passes:
 
 ## Status
 
-Triage is in progress. On 2026-10-20, the owner confirmed F1's policy: keep deposits and schedule
+The owner approved the dispositions on 2026-10-21; the register lists the closure conditions still
+open. On 2026-10-20, the owner confirmed F1's policy: keep deposits and schedule
 creation open, and protect the quoted execution rate against actual input changes. The owner also
 excluded all Sovryn integration from the initial release. A Sovryn handler can be deployed later;
 its unresolved integration risks remain conditions for that future review. The owner also excluded
