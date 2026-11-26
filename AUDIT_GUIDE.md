@@ -360,7 +360,9 @@ pre-audit map and the Fizz fuzzing suite in `test/fizz/`. Kann Audits reviewed `
 issues #1–#26 in two rounds, in a private repository. BitChill's responses are posted on the issues,
 and the fixes and documentation lines they promise are
 [R121](./docs/relaunch/R121-kann-audit-followups.md) to
-[R125](./docs/relaunch/R125-kann-docs-and-consistency.md). Accepted risks are stated in this guide.
+[R125](./docs/relaunch/R125-kann-docs-and-consistency.md).
+[R126](./docs/relaunch/R126-dex-floor-cap.md) gives the Dex floor that #22 describes a fixed lower
+bound. Accepted risks are stated in this guide.
 
 Slither and Aderyn run on `src/` only (`make slither`, `make aderyn`). Slither exits non-zero because
 its triaged findings are kept visible instead of suppressed. Each detector's classification, false
