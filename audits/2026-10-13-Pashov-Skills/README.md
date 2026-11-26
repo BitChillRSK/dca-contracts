@@ -42,7 +42,8 @@ The orchestrator applied the skill's gates with these rules in all three passes:
 
 ## Status
 
-Triage is in progress. On 2026-10-20, the owner confirmed F1's policy: keep deposits and schedule
+The owner approved the dispositions on 2026-10-21; the register lists the closure conditions still
+open. On 2026-10-20, the owner confirmed F1's policy: keep deposits and schedule
 creation open, and protect the quoted execution rate against actual input changes. The owner also
 excluded all Sovryn integration from the initial release. A Sovryn handler can be deployed later;
 its unresolved integration risks remain conditions for that future review. The owner also excluded
@@ -187,6 +188,9 @@ Limits of this run:
 
 [`fizz_data/report.md`](../../fizz_data/report.md) has the full results, coverage per contract, and
 next steps. [`fizz_data/property-plan.md`](../../fizz_data/property-plan.md) gives each property's
-source and reasoning. The Medusa corpus, the coverage HTML and the compile caches are not committed.
+source and reasoning. The rest of `fizz_data/` is the generator's record of this run: its ABI inventory and entry-point
+selection describe the scanned `src/` and do not follow later ABI changes, so a new harness
+generation starts from a fresh discovery. The Medusa corpus, the coverage HTML and the compile caches
+are not committed.
 To rerun, run `medusa fuzz` from the repository root, or
 `forge test --match-contract FoundryTester` for the Foundry tests.
