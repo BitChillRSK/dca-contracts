@@ -1576,6 +1576,15 @@ Next, after separate review and owner merge approval: configuration (#12, #23, #
 purchase reentrancy (#18 I-09), then remaining audit documentation and source consistency.
 These later PRs require their own specs and are not assigned by R122.
 
+### R123 - Kann configuration follow-ups ([spec](./R123-kann-configuration.md))
+
+After R122. Second of the four Kann follow-up PRs. The eight named setters reject an unchanged
+value (#12), the three configuration constructors emit their initial events (#23), and
+`DcaManagerAccessControl` rejects a zero manager (#20 item 5). Ask: none.
+
+Next: purchase reentrancy (#18 I-09), then the remaining audit documentation and source
+consistency. Each needs its own spec.
+
 ## Closed non-implementation decisions
 
 There is no optional-late queue. Items either have an ordered spec above or are closed here:

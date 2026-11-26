@@ -72,7 +72,8 @@ decided against). No further re-judgement PRs.
 
 ## Status
 
-- Current follow-up: [R122-kann-lending-withdrawals.md](./R122-kann-lending-withdrawals.md), assigned on 2026-11-25 from `main`, GitHub [#199](https://github.com/BitChillRSK/dca-contracts/pull/199). Implements Kann #14, #19 and #20 item 1. Next unassigned: configuration follow-ups, after R122 review and explicit owner merge approval.
+- Merged: [R122-kann-lending-withdrawals.md](./R122-kann-lending-withdrawals.md) (GitHub [#199](https://github.com/BitChillRSK/dca-contracts/pull/199)), Kann #14, #19 and #20 item 1.
+- Current follow-up: [R123-kann-configuration.md](./R123-kann-configuration.md), assigned on 2026-11-25, GitHub [#200](https://github.com/BitChillRSK/dca-contracts/pull/200), Kann #12, #23 and #20 item 5. Next unassigned: purchase reentrancy (#18 I-09), after R123 review and explicit owner merge approval.
 
 - Merged: [R23-toolchain-baseline.md](./R23-toolchain-baseline.md) (PR 1, GitHub [#42](https://github.com/BitChillRSK/dca-contracts/pull/42)). Rootstock testnet accepted solc 0.8.36 / `cancun`.
 - Assigned: [R2-utc-purchase-period.md](./R2-utc-purchase-period.md) (PR 3, GitHub [#44](https://github.com/BitChillRSK/dca-contracts/pull/44)). No product gates. Does not wait on PR 2.

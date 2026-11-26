@@ -121,9 +121,12 @@ interface IDcaManager {
     event DcaManager__DcaScheduleDeleted(
         address indexed user, address indexed token, uint64 indexed scheduleId, uint256 refundedAmount
     );
-    /// @notice Owner changed the per-token schedule cap.
+    /// @notice The per-token schedule cap was set at construction or changed by the owner.
     event DcaManager__MaxSchedulesPerTokenModified(uint256 newMaxSchedulesPerToken);
-    /// @notice Owner changed the protocol minimum purchase period (whole UTC days, never below one).
+    /**
+     * @notice The protocol minimum purchase period (whole UTC days, never below one) was set at
+     *         construction or changed by the owner.
+     */
     event DcaManager__MinPurchasePeriodModified(uint256 newMinPurchasePeriod);
     /// @notice Owner set a per-token minimum purchase amount. Zero is not allowed.
     event DcaManager__TokenMinPurchaseAmountSet(address indexed token, uint256 minPurchaseAmount);
@@ -145,10 +148,16 @@ interface IDcaManager {
     error DcaManager__TokenMinPurchaseAmountNotSet(address token);
     /// @notice Per-token minimum purchase amount must be greater than zero.
     error DcaManager__TokenMinPurchaseAmountMustBeGreaterThanZero(address token);
+    /// @notice The token's minimum purchase amount already has this value.
+    error DcaManager__TokenMinPurchaseAmountUnchanged(address token, uint256 minPurchaseAmount);
     /// @notice Purchase period is below the protocol minimum.
     error DcaManager__PurchasePeriodMustBeAtLeastMinimum();
     /// @notice Protocol minimum purchase period cannot be set below one UTC day.
     error DcaManager__MinPurchasePeriodMustBeAtLeastOneDay();
+    /// @notice The protocol minimum purchase period already has this value.
+    error DcaManager__MinPurchasePeriodUnchanged(uint256 minPurchasePeriod);
+    /// @notice The per-token schedule cap already has this value.
+    error DcaManager__MaxSchedulesPerTokenUnchanged(uint256 maxSchedulesPerToken);
     /// @notice Purchase period must be a whole number of UTC days.
     error DcaManager__PurchasePeriodMustBeWholeDays();
     /// @notice At creation, the purchase amount exceeds the deposit.
@@ -415,12 +424,14 @@ interface IDcaManager {
     /**
      * @notice Set the protocol minimum purchase period.
      * @param minPurchasePeriod New minimum in seconds; at least one whole UTC day.
+     * @dev Reverts with `DcaManager__MinPurchasePeriodUnchanged` if it equals the current minimum.
      */
     function setMinPurchasePeriod(uint256 minPurchasePeriod) external;
 
     /**
      * @notice Set the maximum number of schedules a user may hold per token.
      * @param maxSchedulesPerToken New cap.
+     * @dev Reverts with `DcaManager__MaxSchedulesPerTokenUnchanged` if it equals the current cap.
      */
     function setMaxSchedulesPerToken(uint256 maxSchedulesPerToken) external;
 
@@ -429,6 +440,7 @@ interface IDcaManager {
      * @param token The stablecoin.
      * @param minPurchaseAmount New minimum in that token's native units. Must be greater than zero;
      *        there is no protocol-wide default.
+     * @dev Reverts with `DcaManager__TokenMinPurchaseAmountUnchanged` if it equals the current minimum.
      */
     function setTokenMinPurchaseAmount(address token, uint256 minPurchaseAmount) external;
 

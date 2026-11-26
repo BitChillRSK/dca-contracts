@@ -262,6 +262,8 @@ contract PurchaseUniswapExactConsumptionTest is DcaDappTest {
     function _activatePath(address[] memory mids, uint24[] memory fees) private {
         IPurchaseUniswap handler = IPurchaseUniswap(address(stablecoinHandler));
         bytes32 pathHash = keccak256(_encodePath(mids, fees));
+        // Re-sending the active path reverts `PurchasePathUnchanged`.
+        if (keccak256(handler.getSwapPath()) == pathHash) return;
         if (!handler.isPurchasePathAllowed(pathHash)) {
             vm.prank(OWNER);
             handler.setPurchasePathAllowed(mids, fees, true);

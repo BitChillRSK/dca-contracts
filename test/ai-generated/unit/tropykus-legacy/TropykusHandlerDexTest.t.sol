@@ -226,15 +226,29 @@ contract TropykusHandlerDexTest is HandlerTestHarness {
         _deployTropykusDexWithSlippage(1 ether, 1.01 ether);
     }
 
+    /// @dev The constructor path is active, so re-sending it reverts; another allowlisted path switches.
     function test_tropykusDex_setPurchasePath_success() public {
         address[] memory intermediateTokens = new address[](0); // Direct swap, no intermediates
         uint24[] memory poolFeeRates = new uint24[](1);
         poolFeeRates[0] = 3000; // 0.3%
+        bytes memory activePath = abi.encodePacked(address(stablecoin), uint24(3000), address(wrbtcToken));
+        assertEq(tropykusDexHandler.getSwapPath(), activePath);
 
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPurchaseUniswap.PurchaseUniswap__PurchasePathUnchanged.selector, keccak256(activePath)
+            )
+        );
         vm.prank(OWNER);
         tropykusDexHandler.setPurchasePath(intermediateTokens, poolFeeRates);
 
-        bytes memory expectedPath = abi.encodePacked(address(stablecoin), uint24(3000), address(wrbtcToken));
+        poolFeeRates[0] = 500; // 0.05%
+        vm.startPrank(OWNER);
+        tropykusDexHandler.setPurchasePathAllowed(intermediateTokens, poolFeeRates, true);
+        tropykusDexHandler.setPurchasePath(intermediateTokens, poolFeeRates);
+        vm.stopPrank();
+
+        bytes memory expectedPath = abi.encodePacked(address(stablecoin), uint24(500), address(wrbtcToken));
         assertEq(tropykusDexHandler.getSwapPath(), expectedPath);
     }
 

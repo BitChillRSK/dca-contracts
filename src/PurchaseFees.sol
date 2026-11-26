@@ -46,6 +46,10 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
         s_feePurchaseLowerBound = feeSettings.feePurchaseLowerBound;
         s_minFeeRate = feeSettings.minFeeRate;
         s_maxFeeRate = feeSettings.maxFeeRate;
+        emit PurchaseFees__FeeCollectorAddressSet(feeCollector);
+        emit PurchaseFees__MinFeeRateSet(feeSettings.minFeeRate);
+        emit PurchaseFees__MaxFeeRateSet(feeSettings.maxFeeRate);
+        emit PurchaseFees__PurchaseLowerBoundSet(feeSettings.feePurchaseLowerBound);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -77,6 +81,7 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
     /// @inheritdoc IPurchaseFees
     function setFeeCollector(address feeCollector) external override onlyOwner {
         if (feeCollector == address(0)) revert PurchaseFees__InvalidFeeCollector();
+        if (feeCollector == s_feeCollector) revert PurchaseFees__FeeCollectorUnchanged(feeCollector);
         s_feeCollector = feeCollector;
         emit PurchaseFees__FeeCollectorAddressSet(feeCollector);
     }

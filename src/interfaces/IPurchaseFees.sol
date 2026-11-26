@@ -40,13 +40,16 @@ interface IPurchaseFees {
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
-    /// @notice Owner set the minimum fee rate.
+    /// @notice The minimum fee rate was set at construction or changed by the owner.
     event PurchaseFees__MinFeeRateSet(uint256 minFeeRate);
-    /// @notice Owner set the maximum fee rate.
+    /// @notice The maximum fee rate was set at construction or changed by the owner.
     event PurchaseFees__MaxFeeRateSet(uint256 maxFeeRate);
-    /// @notice Owner set the purchase amount at or below which the maximum fee rate applies.
+    /**
+     * @notice The purchase amount at or below which the maximum fee rate applies was set at
+     *         construction or changed by the owner.
+     */
     event PurchaseFees__PurchaseLowerBoundSet(uint256 feePurchaseLowerBound);
-    /// @notice Owner set the address that receives purchase fees.
+    /// @notice The address that receives purchase fees was set at construction or changed by the owner.
     event PurchaseFees__FeeCollectorAddressSet(address indexed feeCollector);
     /**
      * @notice Non-zero purchase fee credited to the collector's accumulated rBTC.
@@ -63,6 +66,8 @@ interface IPurchaseFees {
     error PurchaseFees__MinFeeRateCannotBeHigherThanMax();
     /// @notice Fee collector cannot be the zero address.
     error PurchaseFees__InvalidFeeCollector();
+    /// @notice `feeCollector` is already the fee collector.
+    error PurchaseFees__FeeCollectorUnchanged(address feeCollector);
     /// @notice A fee rate exceeds the 5% cap.
     error PurchaseFees__MaxFeeRateExceedsCap();
 
@@ -80,7 +85,11 @@ interface IPurchaseFees {
      */
     function setFeeRateParams(uint256 minFeeRate, uint256 maxFeeRate, uint256 feePurchaseLowerBound) external;
 
-    /// @notice Set the address that receives purchase fees on the accumulated-rBTC books.
+    /**
+     * @notice Set the address that receives purchase fees on the accumulated-rBTC books.
+     * @param feeCollector New collector. Cannot be zero.
+     * @dev Reverts with `PurchaseFees__FeeCollectorUnchanged` if it is already the collector.
+     */
     function setFeeCollector(address feeCollector) external;
 
     /*//////////////////////////////////////////////////////////////

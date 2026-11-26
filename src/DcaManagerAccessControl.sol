@@ -31,6 +31,7 @@ abstract contract DcaManagerAccessControl is IDcaManagerAccessControl {
 
     /// @param dcaManager The DcaManager allowed to call handler entry points.
     constructor(address dcaManager) {
+        if (dcaManager == address(0)) revert DcaManagerAccessControl__ZeroDcaManager();
         i_dcaManager = dcaManager;
     }
 }

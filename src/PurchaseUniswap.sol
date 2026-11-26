@@ -101,6 +101,9 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
 
         s_amountOutMinimumPercent = amountOutMinimumPercent.toUint64();
         s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck.toUint64();
+        emit PurchaseUniswap__OracleUpdated(address(0), address(uniswapSettings.mocOracle));
+        emit PurchaseUniswap__AmountOutMinimumPercentUpdated(0, amountOutMinimumPercent);
+        emit PurchaseUniswap__AmountOutMinimumSafetyCheckUpdated(0, amountOutMinimumSafetyCheck);
 
         // The initial owner is not the deployer, so the constructor cannot call the onlyOwner setters
         // and must install the first path itself.
@@ -156,22 +159,29 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
                 revert PurchaseUniswap__UnauthorizedPurchasePathSetter(msg.sender);
             }
         }
+        if (keccak256(s_swapPath) == pathHash) revert PurchaseUniswap__PurchasePathUnchanged(pathHash);
         _setPurchasePath(intermediateTokens, poolFeeRates, newPath);
     }
 
     /// @inheritdoc IPurchaseUniswap
     function setAmountOutMinimumPercent(uint256 amountOutMinimumPercent) external onlyOwner {
         _validateSlippageSettings(amountOutMinimumPercent, s_amountOutMinimumSafetyCheck);
-        emit PurchaseUniswap__AmountOutMinimumPercentUpdated(s_amountOutMinimumPercent, amountOutMinimumPercent);
+        uint256 oldValue = s_amountOutMinimumPercent;
+        if (amountOutMinimumPercent == oldValue) {
+            revert PurchaseUniswap__AmountOutMinimumPercentUnchanged(amountOutMinimumPercent);
+        }
+        emit PurchaseUniswap__AmountOutMinimumPercentUpdated(oldValue, amountOutMinimumPercent);
         s_amountOutMinimumPercent = amountOutMinimumPercent.toUint64();
     }
 
     /// @inheritdoc IPurchaseUniswap
     function setAmountOutMinimumSafetyCheck(uint256 amountOutMinimumSafetyCheck) external onlyOwner {
         _validateSlippageSettings(s_amountOutMinimumPercent, amountOutMinimumSafetyCheck);
-        emit PurchaseUniswap__AmountOutMinimumSafetyCheckUpdated(
-            s_amountOutMinimumSafetyCheck, amountOutMinimumSafetyCheck
-        );
+        uint256 oldValue = s_amountOutMinimumSafetyCheck;
+        if (amountOutMinimumSafetyCheck == oldValue) {
+            revert PurchaseUniswap__AmountOutMinimumSafetyCheckUnchanged(amountOutMinimumSafetyCheck);
+        }
+        emit PurchaseUniswap__AmountOutMinimumSafetyCheckUpdated(oldValue, amountOutMinimumSafetyCheck);
         s_amountOutMinimumSafetyCheck = amountOutMinimumSafetyCheck.toUint64();
     }
 
@@ -180,7 +190,9 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
         if (newOracle == address(0)) {
             revert PurchaseUniswap__InvalidOracleAddress();
         }
-        emit PurchaseUniswap__OracleUpdated(address(s_mocOracle), newOracle);
+        address oldOracle = address(s_mocOracle);
+        if (newOracle == oldOracle) revert PurchaseUniswap__OracleUnchanged(newOracle);
+        emit PurchaseUniswap__OracleUpdated(oldOracle, newOracle);
         s_mocOracle = ICoinPairPrice(newOracle);
     }
 
