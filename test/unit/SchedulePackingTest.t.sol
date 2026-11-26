@@ -298,7 +298,7 @@ contract SchedulePackingTest is DcaDappTest {
         assertEq(stablecoin.balanceOf(USER), userBefore);
     }
 
-    function testUpdatePurchaseAmountAcceptsUint96MaxWhenBalanceAllows() external {
+    function testSetPurchaseAmountAcceptsUint96MaxWhenBalanceAllows() external {
         if (block.chainid != ANVIL_CHAIN_ID) return; // live DOC has no public mint for this size
 
         uint256 maxAmount = type(uint96).max;
@@ -315,7 +315,7 @@ contract SchedulePackingTest is DcaDappTest {
         assertEq(scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).purchaseAmount, maxAmount);
     }
 
-    function testUpdatePurchaseAmountRevertsUint96MaxPlusOne() external {
+    function testSetPurchaseAmountRevertsUint96MaxPlusOne() external {
         uint256 overflowing = uint256(type(uint96).max) + 1;
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         uint256 amountBefore = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).purchaseAmount;
@@ -327,7 +327,7 @@ contract SchedulePackingTest is DcaDappTest {
         assertEq(scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).purchaseAmount, amountBefore);
     }
 
-    function testUpdatePurchasePeriodAcceptsWidestWholeDayPeriod() external {
+    function testSetPurchasePeriodAcceptsWidestWholeDayPeriod() external {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
 
         vm.prank(USER);
@@ -338,7 +338,7 @@ contract SchedulePackingTest is DcaDappTest {
         );
     }
 
-    function testUpdatePurchasePeriodRevertsAboveUint32() external {
+    function testSetPurchasePeriodRevertsAboveUint32() external {
         uint256 overflowing = _maxWholeDayUint32Period() + 1 days;
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         uint256 periodBefore = scheduleAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX).purchasePeriod;
