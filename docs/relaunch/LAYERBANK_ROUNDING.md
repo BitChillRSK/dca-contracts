@@ -1,9 +1,7 @@
-# LayerBank share-exit rounding: audit evidence
+# LayerBank share-exit rounding
 
 This note separates deposit rounding, a handler's forfeited share, and a user's recoverable Pool residue.
-It records the case found during PR [#204](https://github.com/BitChillRSK/dca-contracts/pull/204).
-The one-share forfeiture is the existing decision from PR [#199](https://github.com/BitChillRSK/dca-contracts/pull/199), specified in [R122](./R122-kann-lending-withdrawals.md).
-This note changes no production behavior.
+The one-share forfeiture is specified in [R122](./R122-kann-lending-withdrawals.md).
 
 ## Units and assumptions
 
@@ -23,7 +21,7 @@ An upgrade to different venue rounding requires a new review; see [the adapter's
 
 The fixture deposits 2,000 DOC twice. The total principal `P` is `4000000000000000000000` base units.
 The index is `1017790042495147280571994120`, so `x = 1.01779004249514728057199412`.
-The strengthened test also seeds an unrelated 200 DOC position directly in the user's wallet.
+The test also seeds an unrelated 200 DOC position directly in the user's wallet.
 That position is excluded from BitChill's principal and remains unchanged in scaled units after both withdrawals.
 
 | Step | Result |
@@ -82,13 +80,13 @@ This bound does not replace exact assertions. `test_fork_layerBankWithdrawalThen
 Other tests reject excessive or zero handler share consumption, preserve larger remainders, and isolate other users and routes.
 The stateful suite reconciles booked shares, forfeited shares, and external receipt shares separately.
 
-## Assessment for the second audit
+## Consequences
 
-Rounding is deterministic for a given amount and index. No occurrence frequency has been measured.
-The exact three-unit example does not establish that one-share remainders are rare.
+Rounding is deterministic for a given amount and index; how often a one-share remainder occurs has not
+been measured.
 
 The handler's one-share forfeiture is an accepted accounting tradeoff, not a recovered payment.
-It prevents an impaired route's residual interest claim from blocking a later bulk interest withdrawal.
+[R122](./R122-kann-lending-withdrawals.md) gives the reason for it.
 A larger remainder remains booked. The handler adds no second transfer, owner sweep, or compensation from pooled user funds.
 One-share forfeitures can accumulate across exits; this is not a global one-share cap.
 Likewise, mint-rounding error can accumulate across deposits. The two-deposit tolerance must not become a universal principal guarantee.
@@ -102,12 +100,6 @@ The share-exit path transfers receipt tokens and intentionally makes no Pool cas
 An exact-share transfer sized for the current half-up rule could avoid the handler's one-share remainder.
 That sizing would add a dependency on the transfer rounding rule. The current floored transfer stays within the booked shares under both half-up and round-up rules.
 A change to exact-share transfer sizing therefore needs a separate review of exit availability after a venue upgrade.
-The current one-share forfeiture remains the approved policy; this test follow-up does not replace it.
-
-Recommended audit treatment: review the forfeiture as an explicit design decision and verify the stated custody boundaries and bounds.
-An auditor can still report accepted rounding, cumulative forfeiture, or an external-protocol assumption as informational or low severity.
-Documentation and passing tests do not determine an independent auditor's classification.
-This example gives no reason to add a production sweep, a compensation mechanism, or a redemption to the share-transfer exit.
 
 ## Replay
 

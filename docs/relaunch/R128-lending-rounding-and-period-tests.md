@@ -8,7 +8,7 @@ Status: **implemented; [PR #205](https://github.com/BitChillRSK/dca-contracts/pu
 - Verify handler share movement, forfeiture, user redemption, cash receipts, and preservation of a separate wallet position.
 - Replace the invalid launch-minimum invariant with the permanent one-day, whole-day rules.
 - Check governance changes and rejection of creation and edits below the current minimum.
-- Document the pinned-block example and its audit assumptions in `LAYERBANK_ROUNDING.md`.
+- Document the pinned-block example and its assumptions in `LAYERBANK_ROUNDING.md`.
 
 ## Validation
 
