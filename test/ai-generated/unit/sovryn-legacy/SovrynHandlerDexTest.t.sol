@@ -106,7 +106,6 @@ contract SovrynHandlerDexTest is HandlerTestHarness {
 
     function test_sovrynDex_deployment() public {
         assertEq(sovrynDexHandler.getAmountOutMinimumPercent(), DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT);
-        assertEq(sovrynDexHandler.MIN_AMOUNT_OUT_MINIMUM_PERCENT(), 0.95 ether);
         assertNotEq(address(sovrynDexHandler.getMocOracle()), address(0));
         assertGt(sovrynDexHandler.getSwapPath().length, 0);
     }
@@ -134,7 +133,7 @@ contract SovrynHandlerDexTest is HandlerTestHarness {
 
     /// @dev The fixed bound: no owner call can set the live floor below 95%.
     function test_sovrynDex_setAmountOutMinimumPercent_reverts_belowFixedBound() public {
-        uint256 bound = sovrynDexHandler.MIN_AMOUNT_OUT_MINIMUM_PERCENT();
+        uint256 bound = 0.95 ether;
         uint256 percentBefore = sovrynDexHandler.getAmountOutMinimumPercent();
 
         vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);

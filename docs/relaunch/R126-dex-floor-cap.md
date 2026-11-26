@@ -20,6 +20,10 @@ Replace the owner-settable Dex safety check with a constant. The owner can still
 - The owner, 2026-11-25: the floor's lower bound was never capped in code, and V1 carried that over. A community question on the RootstockCollective asked whether slippage is capped in code. The owner wants it capped before the next audit.
 - The Dex execution-quality policy (`DEX-CAPACITY` in relaunch-control) makes the bot's quote checks the operational bound. The contract floor is the emergency backstop for a missing, stale or hostile caller minimum. That backstop does not need to be widened in operation, so it can be fixed.
 
+## Review decision — 2026-11-26
+
+The owner requested an internal constant with no public getter. No production consumer needs the getter. Tests assert the accepted and rejected percentages directly.
+
 ## Open product decisions
 
 **none.** The constant is 95%, the current launch safety check. The owner can choose another value before merge.
@@ -27,7 +31,7 @@ Replace the owner-settable Dex safety check with a constant. The owner can still
 ## Scope
 
 - [ ] `PurchaseUniswap`:
-  - `uint256 public constant MIN_AMOUNT_OUT_MINIMUM_PERCENT = 0.95 ether`;
+  - `uint256 internal constant MIN_AMOUNT_OUT_MINIMUM_PERCENT = 0.95 ether`;
   - the constructor and `setAmountOutMinimumPercent` require `MIN_AMOUNT_OUT_MINIMUM_PERCENT <= amountOutMinimumPercent <= 100%`, with the existing `TooLow` / `TooHigh` errors.
 - [ ] Remove:
   - `s_amountOutMinimumSafetyCheck`;
@@ -62,7 +66,7 @@ Replace the owner-settable Dex safety check with a constant. The owner can still
 ## Required tests
 
 - The constructor and the setter accept exactly 95% and 100%, and reject 95% minus one wei (`TooLow`) and 100% plus one wei (`TooHigh`).
-- `MIN_AMOUNT_OUT_MINIMUM_PERCENT()` returns `0.95 ether`.
+- The fixed bound stays internal. Existing constructor, setter and purchase tests verify the 95% behavior without a public constant getter.
 - No remaining owner call can lower the floor below 95%.
 - The swap-time floor is unchanged at the same settings: purchases and the min-out tests pass unchanged apart from the removed argument.
 - `make check`, `make check-deploy`, `make fork-layerbank`, `make fork-dex-path`.
@@ -80,6 +84,6 @@ Replace the owner-settable Dex safety check with a constant. The owner can still
 
 ## ABI / deploy / cutover impact
 
-- ABI: the Dex handlers lose one setter, one getter, one event and two errors, and gain the `MIN_AMOUNT_OUT_MINIMUM_PERCENT()` getter. The constructor loses one argument.
+- ABI: the Dex handlers lose one setter, one getter, one event and two errors, and expose no replacement getter. `MIN_AMOUNT_OUT_MINIMUM_PERCENT` stays internal. The constructor loses one argument.
 - Deploy: scripts change with the constructor. Creation code and addresses change.
 - Consumers: an ABI refresh for anything that vendors the Dex handler ABI. No consumer at its assigned head calls the safety-check setter or getter.

@@ -358,11 +358,9 @@ abstract contract HandlerTestHarness is Test {
 
         // Test DEX configuration getters
         uint256 minPercent = dexHandler.getAmountOutMinimumPercent();
-        uint256 bound = dexHandler.MIN_AMOUNT_OUT_MINIMUM_PERCENT();
         bytes memory swapPath = dexHandler.getSwapPath();
 
-        assertEq(bound, 0.95 ether);
-        assertLe(bound, minPercent); // the fixed bound sits at or below the live floor
+        assertLe(0.95 ether, minPercent); // the fixed bound sits at or below the live floor
         assertLe(minPercent, 1 ether);
         assertGt(swapPath.length, 0);
         uint256 packed;
@@ -394,7 +392,7 @@ abstract contract HandlerTestHarness is Test {
         dexHandler.setAmountOutMinimumPercent(1.01 ether);
 
         // Below the fixed bound.
-        uint256 bound = dexHandler.MIN_AMOUNT_OUT_MINIMUM_PERCENT();
+        uint256 bound = 0.95 ether;
         vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);
         vm.prank(OWNER);
         dexHandler.setAmountOutMinimumPercent(bound - 1);

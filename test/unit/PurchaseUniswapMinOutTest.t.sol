@@ -261,8 +261,6 @@ contract PurchaseUniswapMinOutTest is Test {
         swapRouter.setAmountOut(tightFloor - 1);
         vm.expectRevert(bytes("Too little received"));
         _buyOne(harness, gross, NO_MIN_RBTC_OUT);
-
-        assertEq(harness.MIN_AMOUNT_OUT_MINIMUM_PERCENT(), MIN_PERCENT, "the bound is fixed");
     }
 
     /// @dev The fixed bound is what a compromised swapper cannot get under. Even after the owner widens

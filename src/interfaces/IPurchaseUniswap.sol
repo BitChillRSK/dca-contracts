@@ -152,12 +152,6 @@ interface IPurchaseUniswap {
     function getAmountOutMinimumPercent() external view returns (uint256);
 
     /**
-     * @notice The lowest swap-time oracle floor the owner can set, fixed in code.
-     * @return `0.95 ether`, 95% of the oracle-implied rBTC.
-     */
-    function MIN_AMOUNT_OUT_MINIMUM_PERCENT() external view returns (uint256);
-
-    /**
      * @notice Oracle currently used to build `amountOutMinimum`.
      * @return The MoC BTC/USD feed.
      */

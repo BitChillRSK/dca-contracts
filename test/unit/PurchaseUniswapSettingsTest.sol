@@ -62,8 +62,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
         uint256 initialPercent = dex.getAmountOutMinimumPercent();
 
         assertEq(initialPercent, DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT, "Wrong initial swap-time floor");
-        assertEq(dex.MIN_AMOUNT_OUT_MINIMUM_PERCENT(), 0.95 ether, "Wrong fixed lower bound");
-        assertGe(initialPercent, dex.MIN_AMOUNT_OUT_MINIMUM_PERCENT(), "the deploy default is below the bound");
+        assertGe(initialPercent, 0.95 ether, "the deploy default is below the bound");
 
         uint256 newPercent = DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT * 999 / 1000;
         vm.expectEmit(true, true, true, true);
@@ -82,7 +81,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
     /// @dev The fixed bound. No owner call can set the live floor below 95%.
     function testSetAmountOutMinimumPercentRevertsBelowTheFixedBound() public onlyDexSwaps {
         IPurchaseUniswap dex = IPurchaseUniswap(address(stablecoinHandler));
-        uint256 bound = dex.MIN_AMOUNT_OUT_MINIMUM_PERCENT();
+        uint256 bound = 0.95 ether;
         uint256 percentBefore = dex.getAmountOutMinimumPercent();
 
         vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);
@@ -96,7 +95,7 @@ contract PurchaseUniswapSettingsTest is DcaDappTest {
     function testSetAmountOutMinimumPercentAcceptsTheBoundAndHundredPercent() public onlyDexSwaps {
         IPurchaseUniswap dex = IPurchaseUniswap(address(stablecoinHandler));
         uint256 percentBefore = dex.getAmountOutMinimumPercent();
-        uint256 bound = dex.MIN_AMOUNT_OUT_MINIMUM_PERCENT();
+        uint256 bound = 0.95 ether;
 
         vm.expectEmit(true, true, true, true);
         emit PurchaseUniswap__AmountOutMinimumPercentUpdated(percentBefore, bound);

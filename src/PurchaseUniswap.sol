@@ -27,7 +27,7 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
 
     uint256 internal constant HUNDRED_PERCENT = 1 ether;
     /// @notice Lowest swap-time oracle floor the owner can set: 95% of the oracle-implied rBTC.
-    uint256 public constant MIN_AMOUNT_OUT_MINIMUM_PERCENT = 0.95 ether;
+    uint256 internal constant MIN_AMOUNT_OUT_MINIMUM_PERCENT = 0.95 ether;
     /// @notice decimals of the MoC BTC/USD price. Hardcoded because the oracle exposes no `decimals()`.
     uint256 internal constant ORACLE_DECIMALS = 18;
     /// @notice Wrapped rBTC token this route swaps into and unwraps on withdraw.
@@ -50,8 +50,8 @@ abstract contract PurchaseUniswap is PurchaseRbtc, IPurchaseUniswap {
      * @notice The swap-time oracle floor: the fraction of oracle-implied rBTC the router must pay.
      * @dev Deliberately loose. It is the bound that holds when the caller's `minRbtcOut` is absent,
      * stale, or hostile, not the operational tightness of a healthy batch — the swapper derives that
-     * from a live quote per batch and can only tighten from here. Narrowed to `uint64` because both
-     * setters already cap at `HUNDRED_PERCENT` (1e18), which fits.
+     * from a live quote per batch and can only tighten from here. Narrowed to `uint64` because the constructor
+     * and setter already cap at `HUNDRED_PERCENT` (1e18), which fits.
      */
     uint64 internal s_amountOutMinimumPercent;
     bytes private s_swapPath;

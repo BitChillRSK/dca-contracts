@@ -107,7 +107,6 @@ contract TropykusHandlerDexTest is HandlerTestHarness {
 
     function test_tropykusDex_deployment() public {
         assertEq(tropykusDexHandler.getAmountOutMinimumPercent(), DEFAULT_AMOUNT_OUT_MINIMUM_PERCENT);
-        assertEq(tropykusDexHandler.MIN_AMOUNT_OUT_MINIMUM_PERCENT(), 0.95 ether);
         assertNotEq(address(tropykusDexHandler.getMocOracle()), address(0));
         assertGt(tropykusDexHandler.getSwapPath().length, 0);
     }
@@ -135,7 +134,7 @@ contract TropykusHandlerDexTest is HandlerTestHarness {
 
     /// @dev The fixed bound: no owner call can set the live floor below 95%.
     function test_tropykusDex_setAmountOutMinimumPercent_reverts_belowFixedBound() public {
-        uint256 bound = tropykusDexHandler.MIN_AMOUNT_OUT_MINIMUM_PERCENT();
+        uint256 bound = 0.95 ether;
         uint256 percentBefore = tropykusDexHandler.getAmountOutMinimumPercent();
 
         vm.expectRevert(IPurchaseUniswap.PurchaseUniswap__AmountOutMinimumPercentTooLow.selector);

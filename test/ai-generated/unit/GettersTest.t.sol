@@ -239,12 +239,6 @@ contract GettersTest is DcaDappTest {
                 return;
             }
 
-            try IPurchaseUniswap(address(stablecoinHandler)).MIN_AMOUNT_OUT_MINIMUM_PERCENT() returns (uint256 bound) {
-                assertEq(bound, 0.95 ether);
-            } catch {
-                return;
-            }
-
             try IPurchaseUniswap(address(stablecoinHandler)).getMocOracle() returns (ICoinPairPrice oracle) {
                 assertNotEq(address(oracle), address(0));
             } catch {
