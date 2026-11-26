@@ -169,13 +169,12 @@ How the boundaries are enforced:
   `withdrawLendingShares` instead walks the caller's own id list and reads those schedules directly,
   as `_lockedPrincipal` does. Creation uses a fresh nonce; deletion follows the owner check. Getters
   can read any schedule. The purchase path reads the buyer from the schedule and needs no owner check.
-- Every external function that writes a schedule is `nonReentrant`, except `batchBuyRbtc` and
-  `batchBuyRbtcAcrossHandlers`. Those are swapper-only and finish each handler's schedule writes
-  before calling it. In an across-handlers call a later handler's schedules are written after earlier
-  handler calls; handlers are BitChill-deployed, so this is accepted. No user mutator writes back a
-  schedule value it read before its handler call, and a balance written before that call is logged
-  before it too. A purchase reached from a token or market callback during the call therefore keeps
-  its debit, and its `TokenBalanceUpdated` is the schedule's last.
+- Every external function that writes a schedule is `nonReentrant`, both purchase entry points
+  included. A purchase reached from a token or market callback during a user call reverts, and so
+  does a claim or any other guarded call made during a purchase. `batchBuyRbtcAcrossHandlers` loops
+  the private one-handler helper, not the guarded entry point. As defense in depth, `depositToken` and
+  `withdrawToken` store and log the new balance before their handler call, and no user mutator writes
+  back a value read before it.
 
 `AGENTS.md` lists these and the other invariants contributors must preserve, under **Protocol
 invariants**, with the reason for each.

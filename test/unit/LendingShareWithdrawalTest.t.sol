@@ -307,9 +307,8 @@ contract LendingShareWithdrawalTest is DcaDappTest {
         _withdrawShares(USER);
     }
 
-    /// @dev Purchases are not reentrancy-guarded. A purchase for another user nested in the receipt
-    ///      transfer burns that user's shares inside the measured interval, so the handler's balance
-    ///      falls by more than the withdrawing user's booked shares and the withdrawal reverts.
+    /// @dev A purchase for another user nested in the receipt transfer hits the reentrancy guard, so
+    ///      the whole share withdrawal reverts and neither user's books move.
     function test_purchaseFromReceiptTokenCallback_revertsWholeWithdrawal() external onlyVenueMocks {
         stablecoin.mint(OTHER_USER, AMOUNT_TO_DEPOSIT);
         vm.startPrank(OTHER_USER);
@@ -334,7 +333,7 @@ contract LendingShareWithdrawalTest is DcaDappTest {
         (bool ok, bytes memory reason) = address(dcaManager)
             .call(abi.encodeCall(IDcaManager.withdrawLendingShares, (address(stablecoin), s_routeIndex)));
         assertFalse(ok);
-        assertEq(bytes4(reason), ILendingHandler.LendingHandler__ShareConsumptionMismatch.selector);
+        assertEq(bytes4(reason), ReentrancyGuardTransient.ReentrancyGuardReentrantCall.selector);
 
         assertEq(_routeBalance(USER), principal);
         assertEq(lendingHandler.getUserShares(USER), shares);

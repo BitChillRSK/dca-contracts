@@ -396,7 +396,8 @@ interface IDcaManager {
     /**
      * @notice Buy rBTC for every named due schedule on one handler.
      * @param batch One handler's purchase batch. Every row must share `token` and `routeIndex`.
-     * @dev Only a swapper on the OperationsAdmin allowlist may call.
+     * @dev Only a swapper on the OperationsAdmin allowlist may call. Non-reentrant: a purchase started
+     *      from inside another guarded call reverts, and so does a guarded call made during the purchase.
      *      Eligibility starts at 00:00 UTC on the due day, leaving that day for retries. A buy consumes
      *      its due slot and skips earlier missed slots, preventing catch-up and, while the period is
      *      unchanged, a second buy that UTC day. An established weekly Monday schedule bought Tuesday
@@ -411,11 +412,11 @@ interface IDcaManager {
     /**
      * @notice Buy rBTC through several handlers atomically in one transaction.
      * @param batches Each element is one handler's purchase batch (`token` + `routeIndex`).
-     * @dev Authenticates the caller once, then purchases each handler's batch in order through the
-     *      same one-handler helper. A failure in any batch — including a paused row or a batch that
-     *      bought less than its own input-scaled minimum — reverts every handler, so a later batch's minimum
-     *      undoes an earlier handler's purchase. `batchBuyRbtc` remains available for one-handler
-     *      retries (same `Batch` type).
+     * @dev Authenticates the caller and takes the reentrancy guard once, then purchases each handler's
+     *      batch in order through the same one-handler helper. A failure in any batch, including a
+     *      paused row or a batch that bought less than its own input-scaled minimum, reverts every
+     *      handler, so a later batch's minimum undoes an earlier handler's purchase. `batchBuyRbtc`
+     *      remains available for one-handler retries (same `Batch` type).
      */
     function batchBuyRbtcAcrossHandlers(Batch[] calldata batches) external;
 

@@ -15,8 +15,7 @@ import {IPurchaseRbtc} from "./interfaces/IPurchaseRbtc.sol";
  * @author BitChill team: Antonio Rodríguez-Ynyesto
  * @notice Stores every DCA schedule and routes user and swapper calls to the handler that holds the
  *         funds they name.
- * @dev Every external schedule mutator is non-reentrant except the allowlisted-swapper purchase paths,
- *      which complete schedule effects before calling BitChill-deployed handlers. A swapper can open a
+ * @dev Every external schedule mutator, purchases included, is non-reentrant. A swapper can open a
  *      self-expiring five-block window that blocks only user mutations capable of invalidating a batch
  *      refreshed after activation. Governance can pause new deposits per route, not purchases or exits.
  */
@@ -170,8 +169,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
     /**
      * @inheritdoc IDcaManager
      * @dev Widths are checked before the handler pull so an overflowing credit cannot move tokens. The
-     *      credit is stored and logged before the pull, so a purchase reached from a callback during the
-     *      pull debits the new balance, and its balance event is the last one.
+     *      credit is stored and logged before the pull.
      */
     function depositToken(address token, uint64 scheduleId, uint256 depositAmount) external override nonReentrant {
         _validateDeposit(depositAmount);
@@ -387,12 +385,12 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
     }
 
     /// @inheritdoc IDcaManager
-    function batchBuyRbtc(Batch calldata batch) external override onlySwapper {
+    function batchBuyRbtc(Batch calldata batch) external override nonReentrant onlySwapper {
         _batchBuyRbtc(batch);
     }
 
     /// @inheritdoc IDcaManager
-    function batchBuyRbtcAcrossHandlers(Batch[] calldata batches) external override onlySwapper {
+    function batchBuyRbtcAcrossHandlers(Batch[] calldata batches) external override nonReentrant onlySwapper {
         uint256 numBatches = batches.length;
         if (numBatches == 0) revert DcaManager__EmptyHandlerBatches();
 
@@ -741,8 +739,7 @@ contract DcaManager is IDcaManager, BitChillOwnable, ReentrancyGuardTransient {
     /**
      * @dev Withdraw principal from one schedule. Debits the requested amount, not what the handler
      *      paid out. `type(uint256).max` means this schedule's whole `tokenBalance`. The debit is stored
-     *      and logged before the handler call, so a purchase reached from a callback during the payout
-     *      logs the last balance.
+     *      and logged before the handler call.
      * @return routeIndex The schedule's stored route, captured before the handler call.
      * @return handler The handler that paid out, so a caller need not resolve it again.
      */
