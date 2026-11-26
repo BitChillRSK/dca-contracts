@@ -34,13 +34,14 @@ The ABI changes are intentional. No compatibility aliases are required.
 - [ ] Record the convention in `AGENTS.md` and update its current function references.
 - [ ] Open or update affected consumer issues in the same turn as the PR.
 - [ ] Correct the pre-existing LayerBank share-withdrawal fork assertion described below. Preserve its exact share-transfer and cash-receipt checks.
+- [ ] Correct the pre-existing schedule-period invariant described below and add its deterministic regression.
 
 ## Out of scope
 
 - `TokenBalanceUpdated` and `UserSharesUpdated` retain their names.
 - Registration, handler assignment, swapper membership, ownership, deposits, withdrawals, and purchases retain their action names.
 - Existing `…Set` events retain their names, including `NewPathSet` and `FeeCollectorAddressSet`.
-- No new behavior, compatibility aliases, parameter changes, storage changes, deployments, or merges.
+- No new production behavior, compatibility aliases, parameter changes, storage changes, deployments, or merges.
 - Historical specs, audit reports, recorded fuzz logs, and corpora remain historical records.
 - No consumer code or consumer pin changes.
 
@@ -62,6 +63,7 @@ The ABI changes are intentional. No compatibility aliases are required.
 - `src/interfaces/IPurchaseUniswap.sol`
 - `test/ai-generated/audit/NethermindAuditFindings.t.sol`
 - `test/ai-generated/fuzz/Handler.t.sol`
+- `test/ai-generated/fuzz/Invariants.t.sol`
 - `test/ai-generated/unit/DcaManagerEdgeCasesTest.t.sol`
 - `test/ai-generated/unit/sovryn-legacy/SovrynHandlerDexTest.t.sol`
 - `test/ai-generated/unit/tropykus-legacy/TropykusHandlerDexTest.t.sol`
@@ -108,7 +110,7 @@ make fork-layerbank
 - [ ] The two new function names replace their old names without aliases.
 - [ ] The six new event names replace their old names.
 - [ ] Only `TokenBalanceUpdated` and `UserSharesUpdated` retain `Updated` in first-party events; no event retains `Modified`.
-- [ ] The source change consists only of approved identifier substitutions.
+- [ ] The production-source change consists only of approved identifier substitutions.
 - [ ] Required commands pass and affected consumers have linked follow-ups.
 - [ ] The PR preserves ancestry from #203 and README Status names the new PR.
 
@@ -150,3 +152,40 @@ FOUNDRY_PROFILE=deploy SWAP_TYPE=mocSwaps LENDING_PROTOCOL=layerbank EXPECTED_LE
 ```
 
 This amendment changes no production lending code or protocol invariant.
+
+## Parent update — 2026-11-26
+
+The owner requested a rebase onto #203 commit `fa838c6e`.
+The branch preserves its internal Dex floor bound and removed public getter.
+Repeat the full gates for this combined tree because the parent update changes executable code.
+
+## Invariant-gate amendment — 2026-11-26
+
+The rebased `make check` found a second test-only defect in `invariant_userBalancesReasonable`.
+Its two-call counterexample lowers the protocol minimum, then creates a schedule below the seven-day launch default.
+The invariant compares that valid schedule against the launch default instead of the permanent one-day floor.
+Existing schedules also remain valid when governance later raises the minimum.
+
+Add a regression that creates a one-day schedule after lowering the minimum and checks it again after a later increase.
+Assert the permanent one-day floor and whole-day periods in the invariant. Preserve the other balance assertions.
+Replay the exact two-action pattern on the parent before accepting this correction.
+This changes no contract or schedule behavior.
+
+The same deterministic regression fails on parent `fa838c6e`: `86400 >= 604800` is false.
+The corrected invariant and regression both pass with the failing seed:
+
+```bash
+SWAP_TYPE=mocSwaps LENDING_PROTOCOL=layerbank EXPECTED_LENDING_PROTOCOL=layerbank STABLECOIN_TYPE=DOC forge test --match-contract '^InvariantTest$' --match-test 'test_invariantAllowsSchedulesBelowTheLaunchMinimum|invariant_userBalancesReasonable' --fuzz-seed 0x77dc9eec8cfcdd8facc3f2a5e6fc2bccbf842cada378658f8546a8e20d2c6e46 -vv
+```
+
+## Verification results — combined tree on `fa838c6e`
+
+- Targeted MoC suites: 51 passed, 0 failed.
+- Targeted Dex suites: 78 passed, 0 failed.
+- `make check` and `make check-deploy`: all six lanes pass, with 1031 / 1047 / 988 / 988 / 1003 / 1003 tests passed.
+- Both profiles: 20 invariant tests pass, 0 failed.
+- `make fork-layerbank`: 543 passed, 0 failed.
+- Pinned fork regression at block 9443471: passes under both profiles.
+- The deterministic schedule-period regression and the original failing seed pass.
+- All four production files match the updated parent plus the approved name substitutions.
+- The inventory contains 13 configuration setters and 15 `Set` events.
