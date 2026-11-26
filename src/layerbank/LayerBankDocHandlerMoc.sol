@@ -7,7 +7,9 @@ import {PurchaseMoc} from "../PurchaseMoc.sol";
 /**
  * @title LayerBankDocHandlerMoc
  * @author BitChill team: Antonio Rodríguez-Ynyesto
- * @notice LayerBank-lent DOC + MoC: deposits supply aTokens; buys redeem DOC for rBTC at Money on Chain.
+ * @custom:security-contact security@bitchill.app
+ * @notice LayerBank-lent DOC + MoC: deposits supply DOC and credit aToken shares; buys redeem DOC for
+ *         rBTC at Money on Chain.
  * @dev Constructor-only leaf. Only its immutable DcaManager moves principal, buys, or withdraws rBTC;
  *      the owner controls fee settings and collection. MoC redeems at its protocol price, so this
  *      route has no pool-slippage floor.

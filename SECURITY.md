@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Email arynyestos@gmail.com with enough detail to reproduce the issue. Do not open a public GitHub issue
+Email security@bitchill.app with enough detail to reproduce the issue. Do not open a public GitHub issue
 for an unfixed vulnerability in a live deployment.
 
 ## Bug bounty

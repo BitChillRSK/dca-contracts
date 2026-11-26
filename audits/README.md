@@ -9,11 +9,11 @@ For the current scope, trust boundaries, and accepted risks, start with
 | June 2025 | [Ivan Fitro](https://twitter.com/FitroIvan) | Manual | Mitigations of the April findings, and the Uniswap V3 integration | 1 Low, 1 Info | [PDF](./pre-relaunch/2025-06-02-Ivan-Fitro.pdf) |
 | 2026-10-02 | [Krait](https://github.com/ZealynxSecurity/krait) by [Zealynx Security](https://zealynx.io) | Automated (AI) | Relaunch `src/` at `5a9ff0fe`, without `src/tropykus-legacy/` (not deployed) | 0 Critical, 0 High, 0 Medium; observations only | [report](./2026-10-02-Krait/krait-report.md) · [JSON](./2026-10-02-Krait/krait-findings.json) · [candidates](./2026-10-02-Krait/findings/) |
 | 2026-10-06 | Nethermind AuditAgent (BitChill-supplied report) | Automated (AI) | Relaunch at `284b3500` on `docs/r113-audit-readiness-docs`; 37 contracts listed in the report | Original: 3 Medium, 3 Low; all six have explicit BitChill dispositions | [original report](./2026-10-06-Nethermind/audit-agent-report.md) · [provenance and dispositions](./2026-10-06-Nethermind/README.md) |
-| 2026-10-13 | [Pashov skills](https://github.com/pashov/skills) solidity-auditor by Pashov Audit Group | Automated (AI) | Relaunch at `d5c09c32` on `refactor/r115-drop-single-rbtc-withdraw`; `src/` without `src/tropykus-legacy/`, and the deploy scripts | 2 findings (confidence 75), 28 leads; not triaged yet | [report](./2026-10-13-Pashov-Skills/dca-contracts-pashov-ai-audit-report-20261013-135445.md) · [provenance and triage notes](./2026-10-13-Pashov-Skills/README.md) |
+| 2026-10-13 | [Pashov skills](https://github.com/pashov/skills) solidity-auditor by Pashov Audit Group | Automated (AI) | Relaunch at `d5c09c32` on `refactor/r115-drop-single-rbtc-withdraw`; `src/` without `src/tropykus-legacy/`, and the deploy scripts | 2 findings (confidence 75), 28 leads; owner-approved [dispositions](../docs/relaunch/PASHOV_TRIAGE_DECISIONS.md) | [report](./2026-10-13-Pashov-Skills/dca-contracts-pashov-ai-audit-report-20261013-135445.md) · [provenance and triage notes](./2026-10-13-Pashov-Skills/README.md) |
 | 2026-10-16 | [Pashov skills](https://github.com/pashov/skills) X-Ray | Automated (AI) pre-audit map | Same `src/` as the 2026-10-13 scan | No findings; invariants, entry points and threat model | [X-Ray](./2026-10-13-Pashov-Skills/x-ray/x-ray.md) · [notes](./2026-10-13-Pashov-Skills/README.md#x-ray) |
 | 2026-10-17 | [Pashov skills](https://github.com/pashov/skills) Fizz | Automated (AI-written fuzzing suite, Medusa) | Same `src/` as the 2026-10-13 scan | 106 properties; 0 SHOULD-HOLD failures, 2 EXPLORATORY for review | [report](../fizz_data/report.md) · [properties](../PROPERTIES.md) · [notes](./2026-10-13-Pashov-Skills/README.md#fizz) |
+| November 2026 | Kann Audits | Manual | Relaunch at `a229ea3b` | Issues #1–#26, in two rounds | Private repository; fixes and documentation in [R121](../docs/relaunch/R121-kann-audit-followups.md)–[R125](../docs/relaunch/R125-kann-docs-and-consistency.md) |
 
-The relaunch code has not had a third-party manual audit.
 
 ## 2025 manual reviews
 
@@ -65,8 +65,10 @@ It is an automated scan, not an engagement with Pashov Audit Group's auditors.
 The scan ran 3 passes of 12 agents, and all 36 agent runs returned a report.
 The report is the unchanged output of the skill. It has 2 findings at confidence 75 and 28 leads.
 A lead is a code smell with an incomplete exploit path, not a scored finding.
-BitChill has not triaged the report yet. The [companion document](./2026-10-13-Pashov-Skills/README.md)
-records provenance, the judging rules, and triage notes.
+The owner approved a disposition for each finding and lead in the
+[disposition register](../docs/relaunch/PASHOV_TRIAGE_DECISIONS.md); R117 and R118 implement the
+selected fixes. The [companion document](./2026-10-13-Pashov-Skills/README.md) records provenance,
+the judging rules, and triage notes.
 
 After the scan, BitChill ran two more skills from the same repository on the same `src/`.
 X-Ray wrote a pre-audit map: invariants, entry points and a threat model. It has no findings.
@@ -75,6 +77,15 @@ against local mocks of the venues. No SHOULD-HOLD property failed. Two EXPLORATO
 One confirms the scan's lead on deposits inside the protected window, which is dust without a lending
 loss. The other was too strong for an owner-set 1-wei minimum. The campaign was short (8.5 minutes).
 The companion document has the details and the limits.
+
+## Kann Audits review (November 2026)
+
+Kann Audits' security researchers reviewed the relaunch code at `a229ea3b` by hand. They filed their
+findings as GitHub issues in a private repository, in two rounds: #1–#11, then #12–#26. BitChill's
+responses are posted on the issues. The fixes and documentation lines those responses promise are
+[R121](../docs/relaunch/R121-kann-audit-followups.md) to
+[R125](../docs/relaunch/R125-kann-docs-and-consistency.md), so the final release differs from the
+reviewed commit.
 
 ## Static analysis
 

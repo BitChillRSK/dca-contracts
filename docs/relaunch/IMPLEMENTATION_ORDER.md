@@ -685,11 +685,11 @@ R51 follow-up that PR 103 correctly left out of scope. `s_amountOutMinimumPercen
 Uniswap floor today; R51 added `minRbtcOut` but did not wire it into `ExactInputParams`. Keep both
 slippage words and the handler ABI unchanged from mainnet-current: the swap-time floor stays
 `s_amountOutMinimumPercent`, retuned **99.5% → 97%** (probe-derived at block 9198813); the **95%**
-`s_amountOutMinimumSafetyCheck` remains the configuration wall (`safetyCheck <= percent <= 100%`).
-Pass `max(amountOutLowerBound, minRbtcOut)` into the router; `PurchaseRbtc` still checks measured output.
-Inside `[95%, 100%]` the owner retightens or widens the live floor in one transaction; widening
-*past* 95% still needs two transactions (lower the safety check first). Production Dex still sends a
-nonzero quote-derived `minRbtcOut`.
+`s_amountOutMinimumSafetyCheck` remains the configuration wall (`safetyCheck <= percent <= 100%`). Pass
+`max(amountOutLowerBound, minRbtcOut)` into the router; `PurchaseRbtc` still checks measured output.
+Inside `[95%, 100%]` the owner retightens or widens the live floor in one call; widening *past* 95%
+takes two calls (lower the safety check first), which one Safe transaction can batch. Production Dex
+still sends a nonzero quote-derived `minRbtcOut`.
 
 Ask: none.
 
@@ -1593,6 +1593,13 @@ store-and-log-before-call ordering stays. Ask: none.
 
 Next: the remaining audit documentation and the source-consistency sweep, with its own spec.
 
+### R125 - Kann documentation and source consistency ([spec](./R125-kann-docs-and-consistency.md))
+
+After R124. Last of the four Kann follow-up PRs: the documentation half of the responses to #13 and
+#16–#26, the security contact, an R66 amendment (D3, #17), and the `src/` consistency sweep listed in
+the spec. No ABI change; only the Dex setters' store-then-emit reorder changes runtime bytecode.
+Ask: none.
+
 ## Closed non-implementation decisions
 
 There is no optional-late queue. Items either have an ordered spec above or are closed here:
@@ -1673,24 +1680,26 @@ There is no optional-late queue. Items either have an ordered spec above or are 
   read on every successful lending exit (+109 under deploy, about one 200-gas SLOAD on Rootstock),
   user-paid, and a storage parameter on `_withdrawToken`. Reopen only if that call gains an effect a
   revert cannot undo. See [R101](./R101-post-r100-review-cleanups.md#verdicts).
-- **Pack the fee collector beside the fee rates — closed 2026-09-28 (R95 item 4, post-R102 pass).**
-  R95 left this as "reopen with a deploy measurement." Layout closes it without one: the fee word is
-  already full (`uint112` × 2 + `uint16` × 2 = 256 bits); the collector is 160 bits; narrowing the
-  bounds to `uint96` frees only 32 bits; the 12 spare bytes beside Ownable2Step's `_pendingOwner`
-  cannot hold an address; packing into the Dex safety-check word still leaves a purchase-path
-  `SLOAD` because purchases never load that word. The path already does the minimum (fee word once,
-  collector when the fee is nonzero — ~200 Rootstock gas). See
+- **Pack the fee collector beside the fee rates — closed 2026-09-28 (R95 item 4, post-R102 pass).** R95
+  left this as "reopen with a deploy measurement." Layout closes it without one: the fee word is one
+  `uint112` bound and two `uint16` rates (144 bits); the collector is 160 bits, so it does not fit
+  beside them; the 12 spare bytes beside Ownable2Step's `_pendingOwner` cannot hold an address; packing
+  into the Dex safety-check word still leaves a purchase-path `SLOAD` because purchases never load that
+  word. The path already does the minimum (fee word once, collector when the fee is nonzero — ~200
+  Rootstock gas). See
   [R102 post-ship review](./R102-wrbtc-withdraw-seam.md#post-ship-review-2026-09-28).
 - **Cache MoC's post-redeem `address(this).balance` in a local — closed 2026-09-28 (keep re-read).**
   Compiles to `SELFBALANCE` (5 gas on Foundry and Rootstock), not `BALANCE` (400). Naming the
   post-balance costs more stack shuffling than the extra read. Solc 0.8.36 / optimizer 200: the
   re-read wins by 1–5 gas depending on profile and whether the redeem pays. Matches `096719a`. See
   [R102 post-ship review](./R102-wrbtc-withdraw-seam.md#post-ship-review-2026-09-28).
-- **Owner no-op write guards, purchase-only `getHandler`, and `Batch.routeIndex` as `uint32` —
-  closed 2026-09-28 without shipping.** Equality checks on `addSwapper` / `revokeSwapper` /
-  `setFeeCollectorAddress` are owner cold-path code for a rare 5,000-gas Rootstock `RESET`. A
-  purchase-only handler getter would duplicate the shared view for a few gas inside an external call.
-  Narrowing `Batch.routeIndex` does not shrink ABI calldata. Recorded under
+- **Owner no-op write guards, purchase-only `getHandler`, and `Batch.routeIndex` as `uint32` — closed
+  2026-09-28 without shipping.** The no-op guards were later shipped by
+  [R121](./R121-kann-audit-followups.md) (`addSwapper` / `revokeSwapper`) and
+  [R123](./R123-kann-configuration.md) (`setFeeCollector` and seven other setters) after Kann #10 and
+  #12. The 2026-09-28 reasoning was gas only: owner cold-path code for a rare 5,000-gas Rootstock
+  `RESET`. A purchase-only handler getter would duplicate the shared view for a few gas inside an
+  external call. Narrowing `Batch.routeIndex` does not shrink ABI calldata. Recorded under
   [R102 post-ship review](./R102-wrbtc-withdraw-seam.md#post-ship-review-2026-09-28) items 7–9.
 - **SPDX change — reopened 2026-08-31, answered 2026-09-07.** The earlier rejection argued that re-licensing "requires an explicit legal/product process outside the contract implementation stack" and then closed the decision on that basis, which is self-defeating: that is a reason to route the question to a human, not to answer it. See **Licensing — decided**.
 

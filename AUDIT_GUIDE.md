@@ -130,16 +130,20 @@ safety-check bound stops a single percentage change from widening the floor; it 
 `setMocOracle`, which replaces the price the floor is computed from in one transaction with no bound
 against the previous oracle.
 
-**Worst case for a leaked swapper key.** The key can reopen the protected window in the block the previous
-one ends, submit a zero caller minimum, and activate any allowlisted Dex path. While windows are
-chained, users cannot pause, edit, delete, withdraw stablecoin or interest, or withdraw lending shares. Each Dex schedule that
-comes due in that time can be filled down to the oracle floor (3% below the oracle at launch settings),
-once per period. MoC routes have no pool to move. Principal cannot leave to anyone but its owner, and
-`revokeSwapper` ends it. This is accepted without a mandatory gap between windows: a gap would give
-users a few open blocks they are unlikely to use before the Safe revokes the key, and a loose fill pays
-the key holder only if they also move the pool around the batch.
+**Worst case for a swapper key, leaked or run under a bad policy.** The key can reopen the protected
+window in the block the previous one ends, submit a zero caller minimum, and activate any allowlisted
+Dex path. While windows are chained, users cannot pause or unpause, edit, delete, withdraw stablecoin
+or interest, or withdraw lending shares. Each Dex schedule that comes due in that time can be filled
+down to the oracle floor (3% below the oracle at launch settings), once per period. MoC routes have no
+pool to move. Principal cannot leave to anyone but its owner, and `revokeSwapper` ends it. An honest
+bot that reactivates after every failed purchase chains windows the same way, so the operating policy
+forbids automatic reactivation after a venue failure
+([R66](./docs/relaunch/R66-batch-row-front-running.md)). This is accepted without a mandatory gap
+between windows: a gap would give users a few open blocks they are unlikely to use before the Safe
+revokes the key, and a loose fill pays the key holder only if they also move the pool around the
+batch.
 
-All nine ownable deployments are constructed under the broadcaster EOA, configured, and then propose
+All eight ownable deployments are constructed under the broadcaster EOA, configured, and then propose
 the Safe as pending owner. The Safe must accept each one. Until acceptance, the broadcaster remains
 owner; afterward, ownership is independent per contract and configuration can diverge unless operations
 apply the same decision everywhere it is meant to apply.
@@ -283,6 +287,15 @@ Other deliberate availability trade-offs:
   purchases, withdrawals or deposits. A lending market can refuse a deposit, for example when the
   deposit would exceed its supply cap or the reserve is frozen; the idle route for the same token stays
   open.
+- Borrowers can take a lending reserve's cash, including in the same block as a preflight read. That
+  stops lending purchases and cash exits on the route until cash returns, and no check before the call
+  can guarantee it succeeds. `withdrawLendingShares` needs no reserve cash, and the idle route for the
+  same token is unaffected.
+- The lending index is the venue's accounting rate, not proof that its claims are backed. A reserve
+  deficit does not lower it: a loss reaches users as failed redemptions or as lower measured cash.
+  Handlers compute no haircut of their own.
+- MoC refuses a DOC redemption whose transaction gas price exceeds its `maxGasPrice`. If Rootstock's
+  minimum gas price rises above that cap, no DOC purchase can execute. Exits do not use MoC.
 - If a stablecoin issuer removes an idle handler's cash, the handler cannot pay every schedule's
   principal. Idle handlers keep no per-route ledger, so purchases and withdrawals pay from the remaining
   cash in arrival order: the loss falls on the users who withdraw or are bought for last, including
@@ -296,6 +309,10 @@ Other deliberate availability trade-offs:
   is forfeited; larger remainders remain claimable. LayerBank's transfer sizing is in
   [`src/layerbank/README.md`](./src/layerbank/README.md). The share withdrawal is blocked during a
   protected window like every other withdrawal.
+- The Dex floor accepts any price the configured MoC BTC/USD feed reports as valid. The feed's validity
+  period, which the cutover runbook records, is its only freshness bound: a valid price can lag the
+  market within it, which loosens the floor or reverts a fair swap. Handlers add no second age
+  check and do not compare the price with the pool.
 - Dex pricing assumes the input stablecoin is worth one USD; there is no stablecoin/USD oracle.
   A downward depeg can stop swaps at the configured BTC/USD-derived floor. An upward depeg does not
   raise that floor. A fair pool can pay the premium, but the floor does not require it; a tight
@@ -330,13 +347,21 @@ Other deliberate availability trade-offs:
 
 [`audits/README.md`](./audits/README.md) lists every report. Two manual reviews from 2025 cover the
 pre-relaunch code. The relaunch code has had three automated audits (Krait, Nethermind AuditAgent, and
-Pashov Audit Group's open-source solidity-auditor skill, October 2026) and no third-party manual
-audit. The Krait report's **Resolution** section records its decisions. The
+Pashov Audit Group's open-source solidity-auditor skill, October 2026) and one manual review, by
+Kann Audits (November 2026). The Krait report's **Resolution** section records its decisions. The
 [AuditAgent companion](./audits/2026-10-06-Nethermind/README.md) records all six dispositions
 separately from the unchanged original report. Its accounting fixes change executable code after the
-first two scans. The Pashov scan ran after those fixes and has not been triaged yet. The
-[Pashov companion](./audits/2026-10-13-Pashov-Skills/README.md) also covers the X-Ray pre-audit map and
-the Fizz fuzzing suite in `test/fizz/`. Accepted risks are stated in this guide.
+first two scans. The Pashov scan ran after those fixes. Its two findings, 28 leads and Fizz follow-ups
+have owner-approved dispositions in
+[`PASHOV_TRIAGE_DECISIONS.md`](./docs/relaunch/PASHOV_TRIAGE_DECISIONS.md), implemented by
+[R117](./docs/relaunch/R117-pashov-mitigations.md) and
+[R118](./docs/relaunch/R118-pashov-optional-hardening.md); the register lists the closure conditions
+still open. The [Pashov companion](./audits/2026-10-13-Pashov-Skills/README.md) also covers the X-Ray
+pre-audit map and the Fizz fuzzing suite in `test/fizz/`. Kann Audits reviewed `a229ea3b` and filed
+issues #1–#26 in two rounds, in a private repository. BitChill's responses are posted on the issues,
+and the fixes and documentation lines they promise are
+[R121](./docs/relaunch/R121-kann-audit-followups.md) to
+[R125](./docs/relaunch/R125-kann-docs-and-consistency.md). Accepted risks are stated in this guide.
 
 Slither and Aderyn run on `src/` only (`make slither`, `make aderyn`). Slither exits non-zero because
 its triaged findings are kept visible instead of suppressed. Each detector's classification, false

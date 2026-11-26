@@ -7,6 +7,7 @@ import {LayerBankHandler} from "./LayerBankHandler.sol";
 /**
  * @title LayerBankHandlerDex
  * @author BitChill team: Antonio Rodríguez-Ynyesto
+ * @custom:security-contact security@bitchill.app
  * @notice Token-agnostic LayerBank lending + Uniswap V3 purchase handler.
  * @dev Constructor-only leaf. Only its immutable DcaManager moves principal, buys, or withdraws rBTC;
  *      the owner controls fees, oracle, path allowlist, and floor. Holds standing max stablecoin

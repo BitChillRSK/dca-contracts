@@ -139,9 +139,9 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
         pure
         returns (uint256 totalFee, uint256[] memory netWeights, uint256 purchaseAmountsSum)
     {
-        uint256 len = purchaseAmounts.length;
-        netWeights = new uint256[](len);
-        for (uint256 i; i < len; ++i) {
+        uint256 purchaseCount = purchaseAmounts.length;
+        netWeights = new uint256[](purchaseCount);
+        for (uint256 i; i < purchaseCount; ++i) {
             uint256 amount = purchaseAmounts[i];
             uint256 fee = _calculateFeeAtRate(amount, feeRate);
 
@@ -166,9 +166,9 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
         uint256 maxFeeRate,
         uint256 feePurchaseLowerBound
     ) private pure returns (uint256 totalFee, uint256[] memory netWeights, uint256 purchaseAmountsSum) {
-        uint256 len = purchaseAmounts.length;
-        netWeights = new uint256[](len);
-        for (uint256 i; i < len; ++i) {
+        uint256 purchaseCount = purchaseAmounts.length;
+        netWeights = new uint256[](purchaseCount);
+        for (uint256 i; i < purchaseCount; ++i) {
             uint256 amount = purchaseAmounts[i];
             uint256 fee = _calculateVariableFee(amount, minFeeRate, maxFeeRate, feePurchaseLowerBound);
 
@@ -184,20 +184,25 @@ abstract contract PurchaseFees is IPurchaseFees, BitChillOwnable {
     }
 
     /// @dev Round the absolute fee once so increasing the purchase amount cannot reduce its fee.
-    function _calculateVariableFee(uint256 amount, uint256 minFeeRate, uint256 maxFeeRate, uint256 lowerBound)
-        private
-        pure
-        returns (uint256)
-    {
-        if (amount <= lowerBound) {
+    function _calculateVariableFee(
+        uint256 amount,
+        uint256 minFeeRate,
+        uint256 maxFeeRate,
+        uint256 feePurchaseLowerBound
+    ) private pure returns (uint256) {
+        if (amount <= feePurchaseLowerBound) {
             return _calculateFeeAtRate(amount, maxFeeRate);
         }
 
         unchecked {
             // Here L < x <= uint96.max and L*(2*x-L) <= x*x, so the entire numerator
             // is at most maxFeeRate*x*x < 2^201. The denominator is nonzero and < 2^110.
-            return (minFeeRate * amount * amount + (maxFeeRate - minFeeRate) * lowerBound * (2 * amount - lowerBound))
-                / (amount * BPS_DENOMINATOR);
+            return (minFeeRate
+                    * amount
+                    * amount
+                    + (maxFeeRate - minFeeRate)
+                    * feePurchaseLowerBound
+                    * (2 * amount - feePurchaseLowerBound)) / (amount * BPS_DENOMINATOR);
         }
     }
 

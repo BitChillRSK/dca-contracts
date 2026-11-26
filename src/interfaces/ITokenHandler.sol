@@ -14,7 +14,7 @@ interface ITokenHandler is IStablecoinSource {
     //////////////////////////////////////////////////////////////*/
     /// @notice Stablecoin was pulled from `user` onto this handler.
     event TokenHandler__TokenDeposited(address indexed token, address indexed user, uint256 amount);
-    /// @notice Stablecoin left this handler to `user`.
+    /// @notice Principal left this handler to `user`. Interest payouts emit `InterestWithdrawn` instead.
     event TokenHandler__TokenWithdrawn(address indexed token, address indexed user, uint256 amount);
 
     /*//////////////////////////////////////////////////////////////

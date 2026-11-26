@@ -13,6 +13,7 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 /**
  * @title OperationsAdmin
  * @author BitChill team: Antonio Rodríguez-Ynyesto
+ * @custom:security-contact security@bitchill.app
  * @notice Registry through which every route class, handler assignment, and swapper check is
  *         resolved.
  * @dev The owner registers route classes and assigns each token-route pair once; neither can be
@@ -111,11 +112,8 @@ contract OperationsAdmin is IOperationsAdmin, BitChillOwnable {
 
     /**
      * @inheritdoc IOperationsAdmin
-     * @dev Deposits are the only user action this registry can stop. It is a circuit breaker
-     *      for one lending market going bad, not a protocol pause: existing positions keep
-     *      purchasing and can always be withdrawn, and every other `(token, routeIndex)` pair is
-     *      untouched. The flag lives here rather than on the handler so governance can stop deposits
-     *      without a handler that must be trusted to unpause itself.
+     * @dev The flag lives here rather than on the handler so governance can stop deposits without a
+     *      handler that must be trusted to unpause itself.
      */
     function setDepositsPaused(address token, uint256 routeIndex, bool paused) external onlyOwner {
         uint32 route = routeIndex.toUint32();

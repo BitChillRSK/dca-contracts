@@ -79,7 +79,8 @@ interface IPurchaseFees {
      * @notice Set all three fee parameters atomically.
      * @param minFeeRate Asymptotic minimum fee rate, in basis points.
      * @param maxFeeRate Highest fee rate. Must be ≥ `minFeeRate` and ≤ 5%.
-     * @param feePurchaseLowerBound Purchase amount at or below which `maxFeeRate` applies.
+     * @param feePurchaseLowerBound Purchase amount at or below which `maxFeeRate` applies, in the token's
+     *        base units: 250 tokens is `250e6` for a 6-decimal token and `250e18` for an 18-decimal one.
      * @dev The only mutation path for these three values: there are no individual bound or rate
      *      setters. Writes each field that changed and emits only those events.
      */
