@@ -28,7 +28,7 @@ contract DcaConfigurationTest is DcaDappTest {
     ///////////////////////////////
     /// DCA configuration tests ///
     ///////////////////////////////
-    function testUpdatePurchaseAmount() external {
+    function testSetPurchaseAmount() external {
         uint256 newPurchaseAmount = AMOUNT_TO_SPEND / 2;
         vm.startPrank(USER);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
@@ -45,7 +45,7 @@ contract DcaConfigurationTest is DcaDappTest {
         vm.stopPrank();
     }
 
-    function testUpdatePurchaseAmountRevertsIfScheduleDoesNotExist() external {
+    function testSetPurchaseAmountRevertsIfScheduleDoesNotExist() external {
         vm.startPrank(USER);
         uint64 wrongScheduleId = UNUSED_SCHEDULE_ID;
         vm.expectRevert(
@@ -58,7 +58,7 @@ contract DcaConfigurationTest is DcaDappTest {
     }
 
     /// @dev The schedule stores its owner, so another account's id is refused as one they do not own.
-    function testUpdatePurchaseAmountRevertsIfCallerDoesNotOwnTheSchedule() external {
+    function testSetPurchaseAmountRevertsIfCallerDoesNotOwnTheSchedule() external {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         address stranger = makeAddr("notTheOwner");
         vm.prank(stranger);
@@ -70,7 +70,7 @@ contract DcaConfigurationTest is DcaDappTest {
         dcaManager.setPurchaseAmount(address(stablecoin), scheduleId, AMOUNT_TO_SPEND);
     }
 
-    function testUpdatePurchasePeriod() external {
+    function testSetPurchasePeriod() external {
         uint256 newPurchasePeriod = MIN_PURCHASE_PERIOD * 7;
         vm.startPrank(USER);
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
@@ -87,7 +87,7 @@ contract DcaConfigurationTest is DcaDappTest {
         vm.stopPrank();
     }
 
-    function testUpdatePurchasePeriodRevertsIfScheduleDoesNotExist() external {
+    function testSetPurchasePeriodRevertsIfScheduleDoesNotExist() external {
         vm.startPrank(USER);
         uint64 wrongScheduleId = UNUSED_SCHEDULE_ID;
         vm.expectRevert(
@@ -100,7 +100,7 @@ contract DcaConfigurationTest is DcaDappTest {
     }
 
     /// @dev The schedule stores its owner, so another account's id is refused as one they do not own.
-    function testUpdatePurchasePeriodRevertsIfCallerDoesNotOwnTheSchedule() external {
+    function testSetPurchasePeriodRevertsIfCallerDoesNotOwnTheSchedule() external {
         uint64 scheduleId = scheduleIdAt(dcaManager, USER, address(stablecoin), SCHEDULE_INDEX);
         address stranger = makeAddr("notTheOwner");
         vm.prank(stranger);
