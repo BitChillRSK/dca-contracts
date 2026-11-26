@@ -184,6 +184,7 @@ Ask = product questions for that PR only. `Start with R2` means PR 3.
 | R120 | after R119, before audit freeze / relaunch deploy | **decided 2026-11-02:** Sovryn becomes legacy like Tropykus: `src/sovryn-legacy/`, out of the deployment and audit scope, route 2 burned, legacy lanes out of the required gates |
 | R121 | after R120 (merged); Kann audit follow-ups | **decided 2026-11-20:** `updatePurchaseAmount` drops the balance bound (Kann #1); swapper setters reject no-op writes and `address(0)` (Kann #10); `AUDIT_GUIDE.md` and runbook lines for Kann #3–#6 |
 | R127 | after R126 (#203), before relaunch deploy | none (owner-approved `set…` functions and `…Set` events; [spec](./R127-setter-names.md)) |
+| R128 | after R127 (#204), before relaunch deploy | none (test and documentation follow-up: LayerBank rounding example and the permanent period floor; [spec](./R128-lending-rounding-and-period-tests.md)) |
 
 ### PR 1 - R23 toolchain and dependency baseline
 
