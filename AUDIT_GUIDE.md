@@ -349,7 +349,7 @@ Other deliberate availability trade-offs:
 
 [`audits/README.md`](./audits/README.md) lists every report. Two manual reviews from 2025 cover the
 pre-relaunch code. The relaunch code has had three automated audits (Krait, Nethermind AuditAgent, and
-Pashov Audit Group's open-source solidity-auditor skill, October 2026) and a third-party review by
+Pashov Audit Group's open-source solidity-auditor skill, October 2026) and one manual review, by
 Kann Audits (November 2026). The Krait report's **Resolution** section records its decisions. The
 [AuditAgent companion](./audits/2026-10-06-Nethermind/README.md) records all six dispositions
 separately from the unchanged original report. Its accounting fixes change executable code after the
