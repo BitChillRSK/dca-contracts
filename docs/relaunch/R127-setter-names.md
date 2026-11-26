@@ -40,7 +40,7 @@ The ABI changes are intentional. No compatibility aliases are required.
 - Registration, handler assignment, swapper membership, ownership, deposits, withdrawals, and purchases retain their action names.
 - Existing `…Set` events retain their names, including `NewPathSet` and `FeeCollectorAddressSet`.
 - No new production behavior, compatibility aliases, parameter changes, storage changes, deployments, or merges.
-- Historical specs, audit reports, recorded fuzz logs, and corpora remain historical records.
+- Historical specs, audit reports, recorded fuzz logs, corpora and the `fizz_data/` generator record remain historical records.
 - No consumer code or consumer pin changes.
 
 ## Files likely touched
@@ -50,11 +50,6 @@ The ABI changes are intentional. No compatibility aliases are required.
 - `docs/relaunch/CUTOVER_RUNBOOK.md`
 - `docs/relaunch/IMPLEMENTATION_ORDER.md`
 - `docs/relaunch/README.md`
-- `fizz_data/contracts.json`
-- `fizz_data/entry-point-selection.json`
-- `fizz_data/invariant-context.md`
-- `fizz_data/last-run.json`
-- `fizz_data/property-plan.md`
 - `src/DcaManager.sol`
 - `src/PurchaseUniswap.sol`
 - `src/interfaces/IDcaManager.sol`

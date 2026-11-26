@@ -258,7 +258,7 @@
           "signature": "transferOwnership(address)"
         },
         {
-          "name": "setPurchaseAmount",
+          "name": "updatePurchaseAmount",
           "inputs": [
             {
               "name": "token",
@@ -278,10 +278,10 @@
           ],
           "stateMutability": "nonpayable",
           "tier": "primary",
-          "signature": "setPurchaseAmount(address,uint64,uint256)"
+          "signature": "updatePurchaseAmount(address,uint64,uint256)"
         },
         {
-          "name": "setPurchasePeriod",
+          "name": "updatePurchasePeriod",
           "inputs": [
             {
               "name": "token",
@@ -301,7 +301,7 @@
           ],
           "stateMutability": "nonpayable",
           "tier": "primary",
-          "signature": "setPurchasePeriod(address,uint64,uint256)"
+          "signature": "updatePurchasePeriod(address,uint64,uint256)"
         },
         {
           "name": "withdrawAllAccumulatedInterest",

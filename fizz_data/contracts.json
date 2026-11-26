@@ -255,7 +255,7 @@
         "stateMutability": "nonpayable"
       },
       {
-        "name": "setPurchaseAmount",
+        "name": "updatePurchaseAmount",
         "inputs": [
           {
             "name": "token",
@@ -276,7 +276,7 @@
         "stateMutability": "nonpayable"
       },
       {
-        "name": "setPurchasePeriod",
+        "name": "updatePurchasePeriod",
         "inputs": [
           {
             "name": "token",
